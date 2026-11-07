@@ -5,9 +5,11 @@ completed preparation or ask for confirmation on ordinary implementation.
 Private repository: https://github.com/DANIIL1253d/Rust-Browser.
 Never push to the development checkout's original Servo remote.
 
-Read COMMUNITY-REPORT.md, BUILD-MANIFEST.json and NEXT-IMPROVEMENTS.md first.
-Source delivery commit: 829fc0bc1329c6e05881361c3a44ccd4197b000c.
-All 89 source overlay files are on private main; logo/preview links were repaired.
+Read SESSION-REPORT.md, COMMUNITY-REPORT.md, BUILD-MANIFEST.json and
+NEXT-IMPROVEMENTS.md first. The 17:30 continuation implemented lazy saved-session
+restoration; selected page loads at startup, background pages on activation.
+The earlier source delivery was 829fc0b; inspect fresh private main for the latest
+iteration. Logo/preview links were repaired in the daytime delivery.
 Inspect fresh git/process state, then choose one meaningful item. Keep code and
 documentation on the private GitHub repository through its authenticated plugin.
 The project is a thin overlay on pinned official Servo v0.7.0; use
@@ -28,14 +30,20 @@ profile data is excluded from source and reports. Cookies/active sessions are
 not ported; do not extract auth stores or DPAPI keys. Password migration uses
 the manager's explicit local CSV workflow, not automatic credential extraction.
 
-19 core + 8 standalone UI/lifecycle + 8 network tests pass. The thin bootstrap
-was exercised against official upstream and passed core/UI suites. The final package passed all five isolated transport cases, including a
-short truncated TLS response and live verified HTTPS. SHA-256 is
-7680c174ae1630319281538bd4fe67669bb5126ab710a59bc3956c823a60de83.
+31 core + 8 standalone UI/lifecycle tests pass. The unchanged 8 network tests
+passed in the daytime run. The thin bootstrap was exercised against official
+upstream. Nine isolated session/benchmark engine cases and all five transport
+cases passed on the current executable, including a short truncated TLS response
+and live verified HTTPS. SHA-256 is
+e0b0b604cf09484d348a877637e34433da52d8d256e979ca6cc9ec3020e2e196.
 Hosted GitHub CI is not yet established as passing; check Actions separately. Native interactive UI
 smoke is still not established; headless results are not that proof.
 
 Highest next priority is media compatibility and useful memory-saving tabs.
+Lazy restore retains blank WebViews; it does not unload normal active pages.
+The controlled synthetic 10-tab comparison measured 383.07 -> 161.11 MiB RSS,
+404.50 -> 180.30 MiB private commit, with only 1 of 10 pages loaded lazily.
+These are short headless development measurements, not a GUI/site memory cap.
 Do not claim full YouTube playback, Chromium extension support, market
 leadership, or a hard 500 MB cap. Do not add decorative controls with no engine
 operation. Respect the user's network mode and appearance toggles.
@@ -48,8 +56,7 @@ Package with Package-Browser.ps1. GUI launches previously rejected by automatic
 review must not be bypassed. Isolated headless fixtures are the available engine
 validation route. Preserve unrelated Happ/system network processes.
 
-The active one-time thread heartbeat is rust-browser-17-30, scheduled for
-7 November at 17:30 Europe/Moscow. After that run, delete its schedule through
-automation_update; do not create repeats without a new user request. Notify only
+The one-time rust-browser-17-30 heartbeat ran on 7 November and was deleted
+through automation_update. Do not create repeats without a new user request. Notify only
 on meaningful results, failures or required user action. Update this checkpoint
 and the Codex-Knowledge wiki with verified outcomes, never personal profile data.

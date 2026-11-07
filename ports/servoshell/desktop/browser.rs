@@ -425,25 +425,18 @@ impl Browser {
                     .as_headed_window()
                     .is_some_and(|h| h.is_password_manager())
             })
-            .flat_map(|w| w.webviews().into_iter().map(|(_, v)| v))
+            .flat_map(|w| w.webviews().into_iter().map(|(id, v)| (id, w.tab_page(&v))).collect::<Vec<_>>())
             .collect();
-        let session = tabs
-            .iter()
-            .filter_map(|v| v.url().map(|u| u.to_string()))
-            .collect::<Vec<_>>();
-        if !session.is_empty() {
-            self.profile.session = session;
-        }
-        if let Some(active) = state
+        let active = state
             .focused_window()
             .filter(|w| {
                 !w.platform_window()
                     .as_headed_window()
                     .is_some_and(|h| h.is_password_manager())
             })
-            .and_then(|w| w.active_webview())
-        {
-            self.profile.active_tab = tabs.iter().position(|v| v.id() == active.id()).unwrap_or(0);
+            .and_then(|w| w.active_webview());
+        self.profile.remember_session(tabs.into_iter().map(|(id, page)| (active.as_ref().is_some_and(|v| v.id() == id), page)));
+        if let Some(active) = active {
             if let Some(url) = active.url() {
                 self.profile
                     .visit(url.as_str(), &active.page_title().unwrap_or_default());

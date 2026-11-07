@@ -73,7 +73,8 @@ try:
             env["RUST_BROWSER_PROFILE"] = profile
             env["RUST_LOG"] = "warn,servo::webview=debug"
             env["SERVO_TRACING"] = "warn,servo::webview=debug"
-            run = subprocess.run([str(app), "--headless", "--exit", "--output", str((work / (name + ".png")).resolve()), *extra, url],
+            run = subprocess.run([str(app), "--headless", "--temporary-storage", "--config-dir", str((Path(profile) / "engine").resolve()),
+                                  "--exit", "--output", str((work / (name + ".png")).resolve()), *extra, url],
                                  cwd=app.parent, env=env, capture_output=True, timeout=50)
             log = (run.stdout + run.stderr).decode("utf-8", errors="replace")
             (work / (name + ".log")).write_text(log, encoding="utf-8")

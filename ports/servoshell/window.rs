@@ -52,6 +52,8 @@ impl ServoShellWindowId {
 pub(crate) struct ServoShellWindow {
     /// The [`WebView`]s that have been added to this window.
     pub(crate) webview_collection: RefCell<WebViewCollection>,
+    #[cfg(not(any(target_os = "android", target_env = "ohos")))]
+    deferred_tabs: RefCell<rust_browser_core::session::DeferredTabs<WebViewId>>,
     /// A handle to the [`PlatformWindow`] that servoshell is rendering in.
     platform_window: Rc<dyn PlatformWindow>,
     /// Whether or not this window should be closed at the end of the spin of the next event loop.
@@ -77,6 +79,8 @@ impl ServoShellWindow {
     pub(crate) fn new(platform_window: Rc<dyn PlatformWindow>) -> Self {
         Self {
             webview_collection: Default::default(),
+            #[cfg(not(any(target_os = "android", target_env = "ohos")))]
+            deferred_tabs: Default::default(),
             platform_window,
             close_scheduled: Default::default(),
             needs_update: Default::default(),
@@ -108,6 +112,8 @@ impl ServoShellWindow {
         state: Rc<RunningAppState>,
         creation_type: TopLevelWebViewCreationRequest,
     ) -> WebView {
+        #[cfg(not(any(target_os = "android", target_env = "ohos")))]
+        let intended = match &creation_type { TopLevelWebViewCreationRequest::WithUrl(url) => Some(url.to_string()), _ => None };
         let mut webview_builder = match creation_type {
             TopLevelWebViewCreationRequest::WithUrl(url) => {
                 WebViewBuilder::new(state.servo(), self.platform_window.rendering_context())
@@ -132,6 +138,10 @@ impl ServoShellWindow {
 
         let webview = webview_builder.build();
         self.add_webview(webview.clone());
+        #[cfg(not(any(target_os = "android", target_env = "ohos")))]
+        if let Some(url) = intended {
+            self.track_loading_webview(webview.id(), rust_browser_core::Page { title: url.clone(), url });
+        }
 
         // If `self` is not in `state.windows`, our notify_accessibility_tree_update() will panic.
         if state.accessibility_active() {
@@ -203,6 +213,20 @@ impl ServoShellWindow {
     }
 
     pub(crate) fn activate_webview(&self, webview_id: WebViewId) {
+        #[cfg(not(any(target_os = "android", target_env = "ohos")))]
+        log::debug!("Selecting tab: deferred={}, target={}", self.is_deferred(webview_id), self.has_restoring_target(webview_id));
+        #[cfg(not(any(target_os = "android", target_env = "ohos")))]
+        {
+            let target = self.deferred_tabs.borrow_mut().begin_activation(webview_id);
+            if let Some(page) = target {
+                if let (Some(view), Ok(url)) = (self.webview_by_id(webview_id), Url::parse(&page.url)) {
+                    view.load(url);
+                    log::debug!("Deferred tab activation started");
+                }
+            } else if self.has_restoring_target(webview_id) {
+                log::debug!("Tab activation waiting or already loading; committed URL present={}", self.webview_by_id(webview_id).is_some_and(|v| v.url().is_some()));
+            }
+        }
         self.webview_collection
             .borrow_mut()
             .activate_webview(webview_id);
@@ -211,10 +235,74 @@ impl ServoShellWindow {
 
     #[cfg_attr(any(target_os = "android", target_env = "ohos"), expect(dead_code))]
     pub(crate) fn activate_webview_by_index(&self, index_to_activate: usize) {
-        self.webview_collection
-            .borrow_mut()
-            .activate_webview_by_index(index_to_activate);
+        let id = self.webview_collection.borrow().creation_order.get(index_to_activate).copied();
+        if let Some(id) = id { self.activate_webview(id); }
+    }
+
+    #[cfg(not(any(target_os = "android", target_env = "ohos")))]
+    pub(crate) fn defer_webview(&self, id: WebViewId, page: rust_browser_core::Page) {
+        self.deferred_tabs.borrow_mut().insert(id, page);
+        if let Some(view) = self.webview_by_id(id) { self.commit_deferred_navigation(&view); }
         self.set_needs_update();
+    }
+
+    #[cfg(not(any(target_os = "android", target_env = "ohos")))]
+    pub(crate) fn track_loading_webview(&self, id: WebViewId, page: rust_browser_core::Page) {
+        self.deferred_tabs.borrow_mut().track_loading(id, page);
+    }
+
+    #[cfg(not(any(target_os = "android", target_env = "ohos")))]
+    pub(crate) fn navigate_webview(&self, view: &WebView, url: Url) {
+        let page = rust_browser_core::Page { title: url.to_string(), url: url.to_string() };
+        let waiting = self.deferred_tabs.borrow_mut().retarget_waiting(view.id(), page.clone());
+        if !waiting {
+            self.track_loading_webview(view.id(), page);
+            view.load(url);
+        }
+        self.set_needs_update();
+        self.set_needs_repaint();
+    }
+
+    #[cfg(not(any(target_os = "android", target_env = "ohos")))]
+    pub(crate) fn is_deferred(&self, id: WebViewId) -> bool {
+        self.deferred_tabs.borrow().is_deferred(id)
+    }
+
+    #[cfg(not(any(target_os = "android", target_env = "ohos")))]
+    pub(crate) fn has_restoring_target(&self, id: WebViewId) -> bool {
+        self.deferred_tabs.borrow().get(id).is_some()
+    }
+
+    #[cfg(not(any(target_os = "android", target_env = "ohos")))]
+    pub(crate) fn tab_page(&self, view: &WebView) -> rust_browser_core::Page {
+        self.deferred_tabs.borrow().get(view.id()).cloned().unwrap_or_else(|| rust_browser_core::Page {
+            title: view.page_title().filter(|s| !s.is_empty()).unwrap_or_else(|| view.url().map(|u| u.to_string()).unwrap_or_else(|| "Новая вкладка".into())),
+            url: view.url().map(|u| u.to_string()).unwrap_or_default(),
+        })
+    }
+
+    #[cfg(not(any(target_os = "android", target_env = "ohos")))]
+    pub(crate) fn commit_deferred_navigation(&self, view: &WebView) {
+        log::debug!("Tab history notification: intended target={}, URL present={}, blank={}", self.has_restoring_target(view.id()), view.url().is_some(), view.url().is_some_and(|u| u.as_str() == "about:blank"));
+        if let Some(url) = view.url() {
+            let (changed, activate) = {
+                let mut tabs = self.deferred_tabs.borrow_mut();
+                let had_target = tabs.get(view.id()).is_some();
+                let activate = tabs.did_navigate(view.id(), url.as_str());
+                (had_target && tabs.get(view.id()).is_none(), activate)
+            };
+            if let Some(page) = activate { view.load(Url::parse(&page.url).expect("Validated restored URL")); }
+            if changed { self.set_needs_repaint(); }
+        }
+    }
+
+    #[cfg(not(any(target_os = "android", target_env = "ohos")))]
+    pub(crate) fn move_webview_to_index(&self, id: WebViewId, index: usize) {
+        let mut views = self.webview_collection.borrow_mut();
+        if !views.creation_order.contains(&id) { return; }
+        views.creation_order.retain(|candidate| *candidate != id);
+        let index = index.min(views.creation_order.len());
+        views.creation_order.insert(index, id);
     }
 
     #[cfg_attr(any(target_os = "android", target_env = "ohos"), expect(dead_code))]
@@ -248,21 +336,28 @@ impl ServoShellWindow {
         let Some(closed) = webview_collection.remove(webview_id) else {
             return;
         };
+        drop(webview_collection);
+        #[cfg(not(any(target_os = "android", target_env = "ohos")))]
+        let deferred_page = self.deferred_tabs.borrow_mut().take(webview_id);
+        #[cfg(not(any(target_os = "android", target_env = "ohos")))]
+        let closed_page = deferred_page.unwrap_or_else(|| self.tab_page(&closed));
         #[cfg(not(any(target_os = "android", target_env = "ohos")))]
         if self
             .platform_window
             .as_headed_window()
             .is_some_and(|w| !w.is_password_manager())
-            && let Some(url) = closed.url()
         {
             crate::desktop::browser::with(|b| {
                 b.profile
-                    .remember_closed(url.as_str(), &closed.page_title().unwrap_or_default());
+                    .remember_closed(&closed_page.url, &closed_page.title);
                 b.save();
             });
         }
         self.platform_window
             .dismiss_embedder_controls_for_webview(webview_id);
+
+        let next = self.webview_collection.borrow().active_id();
+        if let Some(id) = next { self.activate_webview(id); }
 
         self.set_needs_update();
         self.set_needs_repaint();
@@ -352,6 +447,9 @@ impl ServoShellWindow {
                         break;
                     };
                     if let Some(active_webview) = self.active_webview() {
+                        #[cfg(not(any(target_os = "android", target_env = "ohos")))]
+                        self.navigate_webview(&active_webview, url.into_url());
+                        #[cfg(any(target_os = "android", target_env = "ohos"))]
                         active_webview.load(url.into_url());
                     }
                 },
@@ -375,6 +473,8 @@ impl ServoShellWindow {
                     for window in state.windows().iter() {
                         window.set_needs_update();
                         for (_, webview) in window.webviews() {
+                            #[cfg(not(any(target_os = "android", target_env = "ohos")))]
+                            if window.is_deferred(webview.id()) { continue; }
                             webview.reload();
                         }
                     }

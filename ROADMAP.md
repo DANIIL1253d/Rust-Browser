@@ -9,6 +9,7 @@
 - [x] Read-only import of Brave bookmarks and recent history
 - [x] Unicode tab search, bounded persistent recently closed tabs and Ctrl+Shift+T
 - [x] Main-document connection indicator using TLS evidence and document identity
+- [x] Lazy saved-session tabs, deferred activation and isolated 1/5/10-tab memory comparison
 - [x] Migrate all 3,797 eligible Brave history URLs on the owner's PC
 - [x] GitHub plugin access to the owner's private repository; pinned upstream overlay build
 - [x] Receive YouTube/control HTTP 200 through the owner's locally configured browser proxy

@@ -8,8 +8,9 @@ Keep each change independently reviewable and preserve existing profile data.
    actual YouTube playback requirements. First produce a local HTML5 video/audio
    test; then test a public YouTube video, seeking and playback controls. Page
    loading is already fixed, but that does not establish media playback.
-2. **Memory-saving tabs.** Add explicit background-tab unloading and lazy session
-   restoration before automatic policies. Show which tabs need a reload; protect
+2. **Memory-saving tabs.** Lazy saved-session restoration is implemented and measured
+   in [SESSION-REPORT.md](SESSION-REPORT.md). Next add explicit background-tab
+   unloading before automatic policies. Show which tabs need a reload; protect
    active tabs and do not silently discard form edits or media. Measure identical
    1/5/10-tab sessions, including child processes, before/after. Brave's
    [Memory Saver](https://support.brave.app/hc/en-us/articles/13383683902733-How-do-I-use-the-Memory-and-Energy-Saver-features-in-Brave)

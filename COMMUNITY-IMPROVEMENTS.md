@@ -10,9 +10,13 @@ bounded changes; no claim of market leadership or Chromium compatibility.
 | Hidden tabs become difficult to find when the tab-search control disappears or moves | [Brave Community, July–September 2025](https://community.brave.app/t/down-arrow-at-the-end-of-horizontal-tab-list-is-gone/631155) | Add a searchable list in the existing menu and Ctrl+Shift+A; no extra permanent toolbar button |
 | Accidental closure and crashes make previously open tabs difficult to recover | [Mozilla Connect, October 2023](https://connect.mozilla.org/t5/ideas/restore-recently-closed-tabs/idi-p/37024) | Persist a bounded list of 20 closed web tabs; restore with menu or Ctrl+Shift+T |
 | New-tab button disappears when the tab list overflows | [Zen issue #2835](https://github.com/zen-browser/desktop/issues/2835) | Already fixed: keep + outside the horizontal scroll region |
+| Restore a session without loading every background page | [Mozilla Bugzilla #710994](https://bugzilla.mozilla.org/show_bug.cgi?id=710994) | Restore selected page immediately; load saved background pages on selection. Implemented and measured in SESSION-REPORT.md |
 
 These dated individual reports identify concrete problems, not a representative
-market survey. Future candidates: tab unloading, downloads, page search and
+market survey. Mozilla's [session-store documentation](https://firefox-source-docs.mozilla.org/browser/components/sessionstore/docs/events.html)
+also documents loading restored tabs on selection. Our implementation retains
+blank Servo WebViews, so it does not have Firefox's metadata-only browser model.
+Future candidates: full tab unloading, downloads, page search and
 stronger crash/session recovery. Media compatibility remains a separate engine task.
 
 ## Implementation plan

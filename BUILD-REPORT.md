@@ -1,6 +1,8 @@
 # Rust Browser — verification, 7 November 2026
 
-Latest daytime checkpoint: [COMMUNITY-REPORT.md](COMMUNITY-REPORT.md) covers the
+Latest packaged build: [SESSION-REPORT.md](SESSION-REPORT.md) covers the 17:30
+continuation, lazy session restoration and the controlled memory comparison.
+The daytime checkpoint [COMMUNITY-REPORT.md](COMMUNITY-REPORT.md) covers the
 Brave history migration, tab tools, connection security and private GitHub project. The measurements
 and earlier limitations below describe the preceding nightly build.
 

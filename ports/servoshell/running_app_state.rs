@@ -154,15 +154,6 @@ impl WebViewCollection {
         }
     }
 
-    pub(crate) fn activate_webview_by_index(&mut self, index: usize) {
-        let Some(webview_id) = self.creation_order.get(index) else {
-            // Just ignore requests to activate unknown WebViews. This can happen by pressing
-            // keyboard shortcuts in the interface.
-            return;
-        };
-        self.activate_webview(*webview_id);
-    }
-
     pub(crate) fn set_focused(&mut self, focused: bool) {
         self.has_system_focus = focused;
         if let Some(active) = self.active() {
@@ -765,6 +756,8 @@ impl WebViewDelegate for RunningAppState {
     }
 
     fn notify_history_changed(&self, webview: WebView, _entries: Vec<Url>, _current: usize) {
+        #[cfg(not(any(target_os = "android", target_env = "ohos")))]
+        self.window_for_webview(&webview).commit_deferred_navigation(&webview);
         self.window_for_webview(&webview).set_needs_update();
     }
 
@@ -852,6 +845,7 @@ impl WebViewDelegate for RunningAppState {
         self.window_for_webview(&webview).set_needs_update();
 
         if status == LoadStatus::Complete {
+            log::debug!("Tab load completed: URL present={}", webview.url().is_some());
             if let Some(sender) = self
                 .webdriver_senders
                 .borrow_mut()

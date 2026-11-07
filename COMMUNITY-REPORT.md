@@ -1,5 +1,10 @@
 # Rust Browser — community improvements, 7 November 2026
 
+The later 17:30 continuation added lazy session restoration, measured reduced
+startup memory and repaired selection/navigation races. Current package and
+validation: [SESSION-REPORT.md](SESSION-REPORT.md). The sections below record the
+earlier daytime delivery; its binary hash and test counts are historical.
+
 The final desktop build includes tab tools, the profile-only Brave importer,
 connection evidence and truncated-response/cache fixes. The security integration
 build completed in 2m 48s; the final networking increment completed in 29.95s.
@@ -102,7 +107,7 @@ network-engine executables are included in the published source payload.
 ## Next iteration
 
 The owner requested autonomous improvement and a one-time continuation at 17:30
-Moscow time on 7 November. That thread heartbeat was created and its active
-schedule verified. The ordered backlog and acceptance criteria are in
+Moscow time on 7 November. That continuation ran; its schedule was deleted through
+automation_update. No repeat was created. The ordered backlog and acceptance criteria are in
 NEXT-IMPROVEMENTS.md: media compatibility, memory-saving/lazy tabs, optional
 vertical tabs/workspaces, focus mode and essential browser operations.

@@ -45,6 +45,7 @@ pub struct App {
     waker: Box<dyn EventLoopWaker>,
     event_loop_proxy: Option<EventLoopProxy<AppEvent>>,
     initial_url: ServoUrl,
+    session_plan: Option<rust_browser_core::session::SessionPlan>,
     t_start: Instant,
     t: Instant,
     state: AppState,
@@ -69,15 +70,15 @@ impl App {
             &servo_shell_preferences,
         );
 
+        let mut session_plan = servo_shell_preferences.session_fixture.as_ref().map(|fixture| fixture.plan.clone());
         if !servo_shell_preferences.headless
             && servo_shell_preferences.url.is_none()
             && super::browser::with(|b| b.profile.appearance.restore_session)
         {
-            if let Some(url) = super::browser::with(|b| b.profile.session.first().cloned())
-                .and_then(|s| ServoUrl::parse(&s).ok())
-            {
-                initial_url = url;
-            }
+            session_plan = super::browser::with(|b| rust_browser_core::session::SessionPlan::from_profile(&b.profile));
+        }
+        if let Some(plan) = &session_plan {
+            initial_url = ServoUrl::parse(&plan.pages[plan.active].url).expect("Session plan contains parsed URLs");
         }
         let t = Instant::now();
         App {
@@ -87,6 +88,7 @@ impl App {
             waker: event_loop.create_event_loop_waker(),
             event_loop_proxy: event_loop.event_loop_proxy(),
             initial_url,
+            session_plan,
             t_start: t,
             t,
             state: AppState::Initializing,
@@ -157,19 +159,30 @@ impl App {
             platform_window,
             TopLevelWebViewCreationRequest::WithUrl(initial_url),
         );
-        if !self.servoshell_preferences.headless
-            && self.servoshell_preferences.url.is_none()
-            && super::browser::with(|b| b.profile.appearance.restore_session)
-        {
-            let (session, active) =
-                super::browser::with(|b| (b.profile.session.clone(), b.profile.active_tab));
-            for url in session.iter().skip(1).filter_map(|s| Url::parse(s).ok()) {
-                browser_window.create_and_activate_toplevel_webview(
-                    running_state.clone(),
-                    TopLevelWebViewCreationRequest::WithUrl(url),
-                );
+        if let Some(plan) = &self.session_plan {
+            let active_id = browser_window.active_webview().expect("Initial view exists").id();
+            browser_window.track_loading_webview(active_id, plan.pages[plan.active].clone());
+            let eager = self.servoshell_preferences.session_fixture.as_ref().is_some_and(|fixture| fixture.eager);
+            for (index, page) in plan.pages.iter().enumerate().filter(|(index, _)| *index != plan.active) {
+                let url = Url::parse(if eager { &page.url } else { "about:blank" }).expect("Session plan URL");
+                let view = browser_window.create_toplevel_webview(running_state.clone(), TopLevelWebViewCreationRequest::WithUrl(url));
+                if !eager { browser_window.defer_webview(view.id(), page.clone()); }
+                log::trace!("Restored background session slot {index}");
             }
-            browser_window.activate_webview_by_index(active.min(session.len().saturating_sub(1)));
+            browser_window.move_webview_to_index(active_id, plan.active);
+            browser_window.activate_webview(active_id);
+            log::info!("Session restored: {} tabs, {} deferred, active index {}", plan.pages.len(), if eager { 0 } else { plan.pages.len().saturating_sub(1) }, plan.active);
+            if let Some(fixture) = &self.servoshell_preferences.session_fixture {
+                let mut snapshot = rust_browser_core::Profile::default();
+                snapshot.remember_session(browser_window.webviews().into_iter().map(|(id, view)| (id == active_id, browser_window.tab_page(&view))));
+                let valid = snapshot.session.iter().eq(plan.pages.iter().map(|p| &p.url)) && snapshot.active_tab == plan.active;
+                log::info!("Session fixture early snapshot valid: {valid}");
+                log::info!("Session fixture storage: persistent config={}, temporary={}", self.opts.config_dir.is_some(), self.opts.temporary_storage);
+                if let Some(index) = fixture.activate_immediately { browser_window.activate_webview_by_index(index); }
+                if let Some(url) = &fixture.navigate_immediately {
+                    browser_window.navigate_webview(&browser_window.active_webview().expect("Fixture active view"), url.clone());
+                }
+            }
         }
 
         self.state = AppState::Running(running_state);

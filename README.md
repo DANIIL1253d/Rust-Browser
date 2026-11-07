@@ -11,7 +11,7 @@ optional translucent menus. This repository remains private during development.
 
 ## Features
 
-- Integrated Servo engine, tabs, navigation, bookmarks, history and session restoration
+- Integrated Servo engine, tabs, navigation, bookmarks, history and lazy session restoration
 - Dark/light chrome, accent colors, compact navigation and optional glass effects
 - Direct, automatic and proxy-only routing, with domain exceptions
 - Local subscription import: VLESS, VMess, Trojan, Shadowsocks and XHTTP via Xray
@@ -20,6 +20,10 @@ optional translucent menus. This repository remains private during development.
 - Search open tabs with Ctrl+Shift+A and reopen a closed tab with Ctrl+Shift+T
 - Connection details from actual main-document TLS evidence, with explicit HTTP/error states
 - Event-driven rendering: delayed UI timers do not cause a continuous repaint loop
+
+Saved background tabs load when selected. The selected page loads at startup;
+tab order, intended URLs and titles remain available before loading. See the
+[session and memory report](SESSION-REPORT.md) for measured results and limits.
 
 ## Run
 

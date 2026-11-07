@@ -338,11 +338,9 @@ impl Gui {
         webview: WebView,
         favicon_texture: Option<egui::load::SizedTexture>,
     ) {
-        let label = match (webview.page_title(), webview.url()) {
-            (Some(title), _) if !title.is_empty() => title,
-            (_, Some(url)) => url.to_string(),
-            _ => "Новая вкладка".into(),
-        };
+        let page = window.tab_page(&webview);
+        let label = page.title;
+        let deferred = window.is_deferred(webview.id());
 
         let inactive_bg_color = ui.visuals().extreme_bg_color;
         let active_bg_color = ui.visuals().widgets.active.weak_bg_fill;
@@ -371,7 +369,10 @@ impl Gui {
             visuals.widgets.active.expansion = 0.0;
             visuals.widgets.hovered.expansion = 0.0;
 
-            if let Some(favicon) = favicon_texture {
+            if deferred {
+                let (rect, _) = tab_frame.content_ui.allocate_exact_size(Vec2::splat(16.0), egui::Sense::hover());
+                super::icons::paint(&tab_frame.content_ui, rect, super::icons::Icon::History, tab_frame.content_ui.visuals().weak_text_color());
+            } else if let Some(favicon) = favicon_texture {
                 tab_frame.content_ui.add(
                     egui::Image::from_texture(favicon)
                         .fit_to_exact_size(egui::vec2(16.0, 16.0))
@@ -387,6 +388,8 @@ impl Gui {
                 ))
                 .on_hover_ui(|ui| {
                     ui.label(&label);
+                    ui.small(&page.url);
+                    if deferred { ui.weak("Загрузится при выборе вкладки"); }
                 });
 
             let close_button = tab_frame
@@ -694,7 +697,7 @@ impl Gui {
 
         let current_url_string = window
             .active_webview()
-            .and_then(|webview| Some(webview.url()?.to_string()));
+            .map(|webview| window.tab_page(&webview).url);
         match current_url_string {
             Some(location) if location != self.location => {
                 self.location = location;

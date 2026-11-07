@@ -7,6 +7,7 @@ use std::{collections::HashMap, path::Path};
 use url::Url;
 pub mod passwords;
 pub mod secrets;
+pub mod session;
 pub const MAX_HISTORY_ENTRIES: usize = 10_000;
 
 #[derive(Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]

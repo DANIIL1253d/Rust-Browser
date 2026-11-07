@@ -52,6 +52,14 @@ pub(crate) static EXPERIMENTAL_PREFS: &[&str] = &[
     "layout_variable_fonts_enabled",
 ];
 
+#[derive(Clone)]
+pub(crate) struct SessionFixture {
+    pub plan: rust_browser_core::session::SessionPlan,
+    pub eager: bool,
+    pub activate_immediately: Option<usize>,
+    pub navigate_immediately: Option<Url>,
+}
+
 #[cfg_attr(any(target_os = "android", target_env = "ohos"), expect(dead_code))]
 #[derive(Clone)]
 pub(crate) struct ServoShellPreferences {
@@ -71,6 +79,8 @@ pub(crate) struct ServoShellPreferences {
     /// Whether or not to run servoshell in headless mode. While running in headless
     /// mode, image output is supported.
     pub headless: bool,
+    /// Explicit synthetic session input for headless regression/benchmark runs only.
+    pub session_fixture: Option<SessionFixture>,
     /// Filter directives for our tracing implementation.
     ///
     /// Overrides directives specified via `SERVO_TRACING` if set.
@@ -113,6 +123,7 @@ impl Default for ServoShellPreferences {
             clean_shutdown: false,
             device_pixel_ratio_override: None,
             headless: false,
+            session_fixture: None,
             homepage: "servo:newtab".into(),
             initial_window_size: Size2D::new(1280, 820),
             no_native_titlebar: cfg!(target_os = "windows"),
@@ -380,6 +391,9 @@ fn map_debug_options(arg: String) -> Vec<String> {
 #[bpaf(options, version(VERSION), usage("servoshell [OPTIONS] URL"))]
 // Newlines in comments are intentional to have the right formatting for the help message.
 struct CmdArgs {
+    /// Synthetic session JSON for isolated headless tests; requires --headless.
+    #[bpaf(argument("FILE"))]
+    session_fixture: Option<PathBuf>,
     /// Background Hang Monitor enabled.
     #[bpaf(short('B'), long("bhm"))]
     background_hang_monitor: bool,
@@ -673,7 +687,26 @@ fn parse_arguments_helper(args_without_binary: Args) -> ArgumentParsingResult {
         return ArgumentParsingResult::ContentProcess(content_process);
     }
 
-    let config_dir = cmd_args
+    let session_fixture = if let Some(path) = &cmd_args.session_fixture {
+        let fixture = (|| {
+            if !cmd_args.headless { return None; }
+            if std::fs::metadata(path).ok()?.len() > 1024 * 1024 { return None; }
+            let value: serde_json::Value = serde_json::from_slice(&std::fs::read(path).ok()?).ok()?;
+            let eager = value.get("eager").and_then(|v| v.as_bool()).unwrap_or(false);
+            let activate = value.get("activate_immediately").and_then(|v| v.as_u64()).and_then(|n| usize::try_from(n).ok());
+            let navigate = value.get("navigate_immediately").and_then(|v| v.as_str()).map(Url::parse).transpose().ok()?;
+            let profile: rust_browser_core::Profile = serde_json::from_value(value).ok()?;
+            if profile.session.len() > 100 { return None; }
+            Some(SessionFixture { plan: rust_browser_core::session::SessionPlan::from_profile(&profile)?, eager, activate_immediately: activate, navigate_immediately: navigate })
+        })();
+        let Some(fixture) = fixture else {
+            log::error!("Invalid session fixture: requires --headless and a JSON session with 1–100 supported URLs (max 1 MiB)");
+            return ArgumentParsingResult::ErrorParsing;
+        };
+        Some(fixture)
+    } else { None };
+
+    let config_dir = if session_fixture.is_some() { None } else { cmd_args
         .config_dir
         .clone()
         .or_else(default_config_dir)
@@ -681,8 +714,8 @@ fn parse_arguments_helper(args_without_binary: Args) -> ArgumentParsingResult {
             if !config_dir.exists() {
                 fs::create_dir_all(config_dir).expect("Could not create config_dir");
             }
-        });
-    let temporary_storage = cmd_args.temporary_storage;
+        }) };
+    let temporary_storage = session_fixture.is_some() || cmd_args.temporary_storage;
     if let Some(ref time_profiler_trace_path) = cmd_args.profiler_trace_path {
         let mut path = PathBuf::from(time_profiler_trace_path);
         path.pop();
@@ -714,6 +747,7 @@ fn parse_arguments_helper(args_without_binary: Args) -> ArgumentParsingResult {
         device_pixel_ratio_override: cmd_args.device_pixel_ratio,
         clean_shutdown: cmd_args.clean_shutdown,
         headless: cmd_args.headless,
+        session_fixture,
         tracing_filter: cmd_args.tracing_filter,
         initial_window_size: cmd_args.window_size.unwrap_or(default_window_size),
         screen_size_override: cmd_args.screen_size_override,

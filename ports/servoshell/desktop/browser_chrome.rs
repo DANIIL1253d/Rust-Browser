@@ -140,11 +140,12 @@ fn icon(ui: &mut egui::Ui, label: &str, tip: &str, enabled: bool) -> egui::Respo
 fn connection_button(ui: &mut egui::Ui, window: &ServoShellWindow) {
     use servo::ConnectionSecurity as Security;
     let view = window.active_webview();
+    let restoring = view.as_ref().is_some_and(|v| window.has_restoring_target(v.id()));
     // Use the committed document, never the editable address field.
-    let url = view.as_ref().and_then(|v| v.url());
-    let info = view.as_ref().and_then(|v| v.connection_info());
-    let pending = info.is_none()
-        && view.as_ref().is_some_and(|v| v.load_status() == servo::LoadStatus::Started);
+    let url = view.as_ref().and_then(|v| if restoring { url::Url::parse(&window.tab_page(v).url).ok() } else { v.url() });
+    let info = view.as_ref().and_then(|v| if restoring { None } else { v.connection_info() });
+    let pending = restoring || (info.is_none()
+        && view.as_ref().is_some_and(|v| v.load_status() == servo::LoadStatus::Started));
     let security = info.as_ref().map(|i| i.security).or_else(|| {
         url.clone()
             .map(|u| servo::ConnectionInfo::from_response(u, None, false).security)
@@ -556,12 +557,7 @@ impl Chrome {
                         .max_height(420.0)
                         .show(ui, |ui| {
                             for (id, view) in window.webviews() {
-                                let page = rust_browser_core::Page {
-                                    title: view
-                                        .page_title()
-                                        .unwrap_or_else(|| "Новая вкладка".into()),
-                                    url: view.url().map(|u| u.to_string()).unwrap_or_default(),
-                                };
+                                let page = window.tab_page(&view);
                                 if !page.matches(&self.tab_query) {
                                     continue;
                                 }

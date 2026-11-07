@@ -11,7 +11,7 @@
     "webgl",
     "webcrypto"
   ],
-  "offline_tests": 35,
+  "offline_tests": 47,
   "live_youtube_modes": [
     "direct",
     "auto",
@@ -19,12 +19,12 @@
   ],
   "media_backend": false,
   "sha256": {
-    "app/RustBrowser.exe": "7680c174ae1630319281538bd4fe67669bb5126ab710a59bc3956c823a60de83",
+    "app/RustBrowser.exe": "e0b0b604cf09484d348a877637e34433da52d8d256e979ca6cc9ec3020e2e196",
     "runtime/xray.exe": "d5b558191cccb1e92a5772b68b8cab67717b26f634b0f15153215f65ae982a7e",
     "runtime/sing-box.exe": "8f30682ee198855440d2a7fe070d5d3653793b2d01bb8c85eea88f93bbe7c8b9"
   },
   "test_groups": {
-    "core": 19,
+    "core": 31,
     "ui_and_connection_lifecycle": 8,
     "network": 8
   },
@@ -34,5 +34,19 @@
     "tls-bypassed",
     "tls-short-eof-error",
     "https-verified"
-  ]
+  ],
+  "verification_note": "31 core and 8 UI/lifecycle tests passed in this iteration; unchanged 8 network regressions passed in the earlier daytime run.",
+  "session_engine_cases": [
+    "3-lazy",
+    "3-lazy-immediate",
+    "3-lazy-replacement",
+    "1-eager",
+    "1-lazy",
+    "5-eager",
+    "5-lazy",
+    "10-eager",
+    "10-lazy"
+  ],
+  "memory_measurements": "tests/browser-session/results-2026-11-07.json",
+  "automation": "One-time rust-browser-17-30 continuation consumed and deleted; no repeat scheduled."
 }
