@@ -27,3 +27,13 @@ Private visibility was checked before publication. Remote bootstrap, manifest,
 security source, logo, preview and CI files were fetched back successfully.
 The logo/preview 404 links are repaired. Local checks passed; a green hosted
 GitHub Actions run has not yet been established.
+
+## Lazy-session delivery — 17:30 continuation
+
+Commit [acf8d7f](https://github.com/DANIIL1253d/Rust-Browser/commit/acf8d7ff1f38516b51219b4874727824d1408eba)
+contains lazy restore, lifecycle fixes, isolated fixtures and measured results.
+The overlay now lists 96 files. Private visibility and the expected main head were
+checked before the update; it used an expected-head lease without force. Remote
+manifest, new session module, report, README and existing logo were fetched back.
+The updated core suite also passed from the generated pinned-Servo workspace.
+Hosted CI is still not claimed passing.

@@ -97,6 +97,12 @@ appearance settings. No Brave import was repeated.
 
 ## References and continuation
 
+Source was published through the GitHub plugin in private commit
+[acf8d7f](https://github.com/DANIIL1253d/Rust-Browser/commit/acf8d7ff1f38516b51219b4874727824d1408eba).
+The 96-file overlay manifest, new module, report, README and logo were fetched
+back after the leased branch update. The updated core suite also passed after
+applying the overlay to the generated official pinned-Servo workspace.
+
 The historical feature request is [Mozilla Bugzilla #710994](https://bugzilla.mozilla.org/show_bug.cgi?id=710994).
 Mozilla's [session-store events documentation](https://firefox-source-docs.mozilla.org/browser/components/sessionstore/docs/events.html)
 describes selection-driven restoration. This is a behavior reference, not copied

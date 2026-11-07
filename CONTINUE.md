@@ -8,8 +8,10 @@ Never push to the development checkout's original Servo remote.
 Read SESSION-REPORT.md, COMMUNITY-REPORT.md, BUILD-MANIFEST.json and
 NEXT-IMPROVEMENTS.md first. The 17:30 continuation implemented lazy saved-session
 restoration; selected page loads at startup, background pages on activation.
-The earlier source delivery was 829fc0b; inspect fresh private main for the latest
-iteration. Logo/preview links were repaired in the daytime delivery.
+Lazy-session source delivery: acf8d7ff1f38516b51219b4874727824d1408eba.
+All 96 overlay files are represented on private main; key source/report/manifest
+and logo files were fetched back. Inspect fresh main for later documentation.
+Logo/preview links were repaired in the daytime delivery.
 Inspect fresh git/process state, then choose one meaningful item. Keep code and
 documentation on the private GitHub repository through its authenticated plugin.
 The project is a thin overlay on pinned official Servo v0.7.0; use
