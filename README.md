@@ -17,6 +17,7 @@ optional translucent menus. This repository remains private during development.
 - Local subscription import: VLESS, VMess, Trojan, Shadowsocks and XHTTP via Xray
 - DPAPI-encrypted password vault in a separate native window
 - CSV password import/export and read-only Brave bookmark/history import
+- Search open tabs with Ctrl+Shift+A and reopen a closed tab with Ctrl+Shift+T
 - Event-driven rendering: delayed UI timers do not cause a continuous repaint loop
 
 ## Run
@@ -42,6 +43,11 @@ Requirements: Rust stable, Visual Studio C++ tools with Windows SDK, and Python
 ```
 
 Build caches use `.build` by default. `RUST_BROWSER_WORK` overrides that directory.
+The GitHub repository contains all browser modifications as an overlay. On the
+first build, Initialize-ServoSource.ps1 downloads Servo v0.7.0 at the pinned
+revision and applies BROWSER-OVERLAY.json inside the generated build workspace.
+Upstream code remains available from its official repository; third-party
+notices are retained. This avoids vendoring the large upstream WPT corpus.
 The Codex development checkout also recognizes its existing adjacent `work` folder.
 For an optimized build pass `-Release` to both build and packaging scripts.
 
@@ -63,9 +69,12 @@ Brave Shields, DRM and the media backend are not implemented in this build. A li
 subscription must be imported locally before restricted sites can use it. Arbitrary
 websites and unlimited tabs cannot be guaranteed to stay below 500 MB.
 
-The supported Brave importer transfers bookmarks and the 500 most recent history
+The supported Brave importer transfers bookmarks and up to 10,000 history
 entries. Active authenticated sessions/cookies are not imported. Passwords can be
 transferred using the native manager's explicit CSV workflow.
+
+Close Rust Browser before running `app/RustBrowser.exe --import-brave` for the
+profile-only import. It creates a local profile backup and never opens the vault.
 
 ## Project
 
