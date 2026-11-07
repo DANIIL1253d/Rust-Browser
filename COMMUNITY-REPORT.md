@@ -82,7 +82,11 @@ The owner created the private repository
 [DANIIL1253d/Rust-Browser](https://github.com/DANIIL1253d/Rust-Browser) and granted
 the plugin access. The plugin verified private visibility and push/admin access.
 README was initialized through the plugin; source publication uses the same
-plugin's blob/tree/commit/ref APIs.
+plugin's blob/tree/commit/ref APIs. All 89 overlay files were published in
+commit [829fc0b](https://github.com/DANIIL1253d/Rust-Browser/commit/829fc0bc1329c6e05881361c3a44ccd4197b000c).
+Key source, build, artwork and workflow files were fetched back successfully.
+The branch update used a lease, and visibility remains private. Hosted CI is
+not claimed passing; local test/build and packaged-engine evidence is above.
 
 The repository versions all browser modifications, licenses, artwork, build tools
 and CI. The large upstream Servo/WPT corpus is not vendored: Initialize-ServoSource.ps1

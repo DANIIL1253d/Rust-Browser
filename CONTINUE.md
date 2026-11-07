@@ -6,6 +6,8 @@ Private repository: https://github.com/DANIIL1253d/Rust-Browser.
 Never push to the development checkout's original Servo remote.
 
 Read COMMUNITY-REPORT.md, BUILD-MANIFEST.json and NEXT-IMPROVEMENTS.md first.
+Source delivery commit: 829fc0bc1329c6e05881361c3a44ccd4197b000c.
+All 89 source overlay files are on private main; logo/preview links were repaired.
 Inspect fresh git/process state, then choose one meaningful item. Keep code and
 documentation on the private GitHub repository through its authenticated plugin.
 The project is a thin overlay on pinned official Servo v0.7.0; use
@@ -27,8 +29,10 @@ not ported; do not extract auth stores or DPAPI keys. Password migration uses
 the manager's explicit local CSV workflow, not automatic credential extraction.
 
 19 core + 8 standalone UI/lifecycle + 8 network tests pass. The thin bootstrap
-was exercised against official upstream and passed core/UI suites. See current
-reports for final desktop/packaged-engine validation. Native interactive UI
+was exercised against official upstream and passed core/UI suites. The final package passed all five isolated transport cases, including a
+short truncated TLS response and live verified HTTPS. SHA-256 is
+7680c174ae1630319281538bd4fe67669bb5126ab710a59bc3956c823a60de83.
+Hosted GitHub CI is not yet established as passing; check Actions separately. Native interactive UI
 smoke is still not established; headless results are not that proof.
 
 Highest next priority is media compatibility and useful memory-saving tabs.
