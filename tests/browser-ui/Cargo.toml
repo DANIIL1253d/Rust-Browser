@@ -1,0 +1,11 @@
+[package]
+name = "rust-browser-ui-regressions"
+version = "0.1.0"
+edition = "2024"
+[workspace]
+[lib]
+path = "src/lib.rs"
+[dependencies]
+egui = "0.34.3"
+serde = { version = "1", features = ["derive"] }
+url = { version = "2", features = ["serde"] }

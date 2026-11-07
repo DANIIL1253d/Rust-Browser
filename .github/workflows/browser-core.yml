@@ -1,0 +1,28 @@
+name: Browser core
+on:
+  push:
+    paths: ['ports/servoshell/**', 'tests/browser-ui/**', 'components/shared/embedder/**', '.github/workflows/browser-core.yml', 'Initialize-ServoSource.ps1', 'BROWSER-OVERLAY.json']
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  core:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: ilammy/msvc-dev-cmd@v1
+      - name: Prepare pinned Servo workspace
+        run: .\Initialize-ServoSource.ps1
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            .build/servo-source -> target
+            tests/browser-ui -> target
+      - name: Profiles, subscriptions, DPAPI and password imports
+        run: cargo +stable test --manifest-path .build/servo-source/ports/servoshell/browser-core/Cargo.toml
+      - name: UI scheduling regressions
+        run: cargo +stable test --manifest-path tests/browser-ui/Cargo.toml
+    env:
+      CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_LINKER: link.exe

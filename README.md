@@ -18,6 +18,7 @@ optional translucent menus. This repository remains private during development.
 - DPAPI-encrypted password vault in a separate native window
 - CSV password import/export and read-only Brave bookmark/history import
 - Search open tabs with Ctrl+Shift+A and reopen a closed tab with Ctrl+Shift+T
+- Connection details from actual main-document TLS evidence, with explicit HTTP/error states
 - Event-driven rendering: delayed UI timers do not cause a continuous repaint loop
 
 ## Run
@@ -54,8 +55,8 @@ For an optimized build pass `-Release` to both build and packaging scripts.
 ## Verify
 
 ```powershell
-cargo +stable test --manifest-path ports/servoshell/browser-core/Cargo.toml
-cargo +stable test --manifest-path tests/browser-ui/Cargo.toml
+.\Build-Browser.ps1 -CoreTests -PythonPath C:\Path\To\python.exe
+.\Build-Browser.ps1 -UiTests -PythonPath C:\Path\To\python.exe
 .\Build-Browser.ps1 -NetworkTests -PythonPath C:\Path\To\python.exe
 ```
 
@@ -95,4 +96,3 @@ Design workflow: [unslop](https://github.com/heydamir/unslop) by **Damir Sokolov
 (@heydamir)**, CC BY 4.0. Line icons follow Lucide; attribution is in `design`.
 sing-box and Xray run as separate processes; their sources, licenses and hashes
 are documented in `runtime/THIRD-PARTY.txt`.
-

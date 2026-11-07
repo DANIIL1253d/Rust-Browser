@@ -1,0 +1,38 @@
+{
+  "date": "2026-11-07",
+  "platform": "windows-x86_64-msvc",
+  "upstream": "aac43a3f31a259f04a574f5ec4e959c943ad7cc7",
+  "build_profile": "development, debuginfo=0, incremental=false",
+  "features": [
+    "bundled",
+    "clipboard",
+    "js_jit",
+    "multiprocess",
+    "webgl",
+    "webcrypto"
+  ],
+  "offline_tests": 35,
+  "live_youtube_modes": [
+    "direct",
+    "auto",
+    "proxy"
+  ],
+  "media_backend": false,
+  "sha256": {
+    "app/RustBrowser.exe": "7680c174ae1630319281538bd4fe67669bb5126ab710a59bc3956c823a60de83",
+    "runtime/xray.exe": "d5b558191cccb1e92a5772b68b8cab67717b26f634b0f15153215f65ae982a7e",
+    "runtime/sing-box.exe": "8f30682ee198855440d2a7fe070d5d3653793b2d01bb8c85eea88f93bbe7c8b9"
+  },
+  "test_groups": {
+    "core": 19,
+    "ui_and_connection_lifecycle": 8,
+    "network": 8
+  },
+  "isolated_engine_cases": [
+    "http-slow",
+    "tls-rejected",
+    "tls-bypassed",
+    "tls-short-eof-error",
+    "https-verified"
+  ]
+}

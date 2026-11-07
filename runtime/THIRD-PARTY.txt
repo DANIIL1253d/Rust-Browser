@@ -1,0 +1,15 @@
+sing-box 1.14.4, official Windows amd64 build.
+Source and release: https://github.com/SagerNet/sing-box/releases/tag/v1.14.4
+Source code: https://github.com/SagerNet/sing-box/tree/v1.14.4
+License: GPL-3.0-or-later; see LICENSE-sing-box.txt.
+The binary is an unmodified separate process communicating over a loopback HTTP proxy.
+Downloaded archive SHA-256 (verified against GitHub release asset digest on 2026-11-06):
+99185d75d314a07dbba4a130c8ad986cbeb629a07927975636b341ca61f991df
+
+Xray-core 26.10.31, official Windows amd64 build, used for XHTTP.
+Source and release: https://github.com/XTLS/Xray-core/releases/tag/v26.10.31
+Source code: https://github.com/XTLS/Xray-core/tree/v26.10.31
+License: MPL-2.0; see LICENSE-Xray.txt.
+Unmodified separate process; configuration is supplied via stdin, no user keys on disk in plaintext.
+Archive SHA-256 (verified against GitHub release asset digest on 2026-11-06):
+2e04a9995a6f2ad1b28c0bb25c708ecb2695e43a1c9c7889c4b6ac2b48cf7a6a
