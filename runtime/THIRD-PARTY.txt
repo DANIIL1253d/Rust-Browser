@@ -2,6 +2,7 @@ sing-box 1.14.4, official Windows amd64 build.
 Source and release: https://github.com/SagerNet/sing-box/releases/tag/v1.14.4
 Source code: https://github.com/SagerNet/sing-box/tree/v1.14.4
 License: GPL-3.0-or-later; see LICENSE-sing-box.txt.
+The full GPLv3 license is included in COPYING-GPL-3.0.txt.
 The binary is an unmodified separate process communicating over a loopback HTTP proxy.
 Downloaded archive SHA-256 (verified against GitHub release asset digest on 2026-11-06):
 99185d75d314a07dbba4a130c8ad986cbeb629a07927975636b341ca61f991df

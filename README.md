@@ -22,8 +22,7 @@ optional translucent menus. This repository remains private during development.
 - Event-driven rendering: delayed UI timers do not cause a continuous repaint loop
 
 Saved background tabs load when selected. The selected page loads at startup;
-tab order, intended URLs and titles remain available before loading. See the
-[session and memory report](SESSION-REPORT.md) for measured results and limits.
+tab order, intended URLs and titles remain available before loading.
 
 ## Run
 
@@ -53,7 +52,6 @@ first build, Initialize-ServoSource.ps1 downloads Servo v0.7.0 at the pinned
 revision and applies BROWSER-OVERLAY.json inside the generated build workspace.
 Upstream code remains available from its official repository; third-party
 notices are retained. This avoids vendoring the large upstream WPT corpus.
-The Codex development checkout also recognizes its existing adjacent `work` folder.
 For an optimized build pass `-Release` to both build and packaging scripts.
 
 ## Verify
@@ -65,7 +63,11 @@ For an optimized build pass `-Release` to both build and packaging scripts.
 ```
 
 CI checks profiles, subscriptions, DPAPI, CSV behavior and UI scheduling. Full desktop
-builds and site compatibility require separate validation; see [BUILD-REPORT.md](BUILD-REPORT.md).
+builds and site compatibility require separate validation; see [TESTING.md](TESTING.md).
+
+Create a distribution after packaging with `Release-Browser.ps1 -Version v0.1.0`.
+It produces a ZIP and SHA-256 checksums from a fresh application bundle, excluding
+profiles and local development files. See [RELEASE-NOTES.md](RELEASE-NOTES.md).
 
 ## Status
 
@@ -86,8 +88,9 @@ profile-only import. It creates a local profile backup and never opens the vault
 - [Roadmap](ROADMAP.md)
 - [Contributing](CONTRIBUTING-BROWSER.md)
 - [Russian usage guide](README-BROWSER.md)
-- [Design report](design/UNSLOP-REPORT.md)
-- [Private repository status](PRIVATE-REPOSITORY.md)
+- [Contributors](CONTRIBUTORS.md)
+- [Testing](TESTING.md)
+- [Release notes](RELEASE-NOTES.md)
 
 ## Upstream and credits
 

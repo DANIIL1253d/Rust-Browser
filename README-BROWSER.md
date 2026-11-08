@@ -11,7 +11,7 @@
 
 После сборки и упаковки запусти `Start-Browser.cmd` или `app/RustBrowser.exe`.
 Папки `resources` и `runtime` должны оставаться рядом с EXE.
-Файл `BUILD-REPORT.md` содержит фактический результат сборки и проверки этой версии.
+В `RELEASE-NOTES.md` перечислены функции и ограничения выпуска; проверки описаны в `TESTING.md`.
 
 Профиль находится в `%LOCALAPPDATA%\RustBrowser`. `profile.json` хранит закладки,
 до 10 000 адресов и вкладки. `passwords.dat` и `connections.dat` зашифрованы
@@ -136,4 +136,4 @@ Python передаётся через `-PythonPath`. Новый checkout исп
 запускаются отдельными процессами; лицензии, источники и проверенные SHA-256 — в `runtime`.
 
 Дизайн переработан по [unslop](https://github.com/heydamir/unslop) Damir Sokolovsky
-(@heydamir), CC BY 4.0. Аудит и изменения: `design/UNSLOP-REPORT.md`.
+(@heydamir), CC BY 4.0. Уведомления и лицензии: `design/THIRD-PARTY.md`.

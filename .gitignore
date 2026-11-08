@@ -89,3 +89,21 @@ devcontainer-lock.json
 /runtime/xray.exe
 /ports/servoshell/browser-core/target/
 /ports/servoshell/browser-core/Cargo.lock
+
+# Machine-specific development state and generated release artifacts.
+/BROWSER-DESIGN.md
+/BROWSER-PLAN.md
+/BUILD-MANIFEST.json
+/BUILD-REPORT.md
+/COMMUNITY-IMPROVEMENTS.md
+/COMMUNITY-REPORT.md
+/CONTINUE.md
+/NEXT-IMPROVEMENTS.md
+/PRIVATE-REPOSITORY.md
+/SESSION-REPORT.md
+/design/UNSLOP-REPORT.md
+/design/before.png
+/docs/superpowers/
+/tests/browser-session/results-*.json
+/youtube-page-check.png
+/releases/
