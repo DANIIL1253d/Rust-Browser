@@ -3,10 +3,10 @@ $projectRoot = $PSScriptRoot
 if (Test-Path -LiteralPath (Join-Path $projectRoot 'components\script\lib.rs')) { Write-Output $projectRoot; return }
 $taskWork = & (Join-Path $projectRoot 'Get-BrowserWork.ps1') -ProjectRoot $projectRoot
 $sourceRoot = Join-Path $taskWork 'servo-source'
-$baseline = 'aac43a3f31a259f04a574f5ec4e959c943ad7cc7'
+$baseline = '4e136d8ef31b7c4748fbfac606ca463f3efd7537'
 New-Item -ItemType Directory -Path $taskWork -Force | Out-Null
 if (-not (Test-Path -LiteralPath (Join-Path $sourceRoot '.git'))) {
-    & git -c core.longpaths=true clone --filter=blob:none --no-checkout --depth=1 --branch v0.7.0 https://github.com/servo/servo.git $sourceRoot | Out-Host
+    & git -c core.longpaths=true clone --filter=blob:none --no-checkout --depth=1 --branch v0.8.0 https://github.com/servo/servo.git $sourceRoot | Out-Host
     if ($LASTEXITCODE -ne 0) { throw 'Cannot download the pinned Servo source.' }
     & git -C $sourceRoot sparse-checkout init --cone | Out-Host
     if ($LASTEXITCODE -ne 0) { throw 'Cannot initialize the Servo workspace.' }

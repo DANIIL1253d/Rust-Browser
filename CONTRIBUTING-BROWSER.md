@@ -1,8 +1,8 @@
 # Contributing to Rust Browser
 
 Keep changes small and state the user-visible result, verification and remaining
-limits. The upstream Servo baseline is v0.7.0 at
-`aac43a3f31a259f04a574f5ec4e959c943ad7cc7`; retain upstream notices and history references.
+limits. The upstream Servo baseline is v0.8.0 at
+`4e136d8ef31b7c4748fbfac606ca463f3efd7537`; retain upstream notices and history references.
 
 Run the browser-core tests after profile, password or subscription changes. Run
 the standalone UI scheduling tests after event-loop changes. Networking changes

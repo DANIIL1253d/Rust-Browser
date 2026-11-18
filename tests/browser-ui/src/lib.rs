@@ -4,6 +4,10 @@ mod connection;
 mod repaint;
 #[path = "../../../ports/servoshell/desktop/tab_shortcuts.rs"]
 mod tab_shortcuts;
+#[path = "../../../ports/servoshell/desktop/media_controls/state.rs"]
+mod media_controls_state;
+#[path = "../../../ports/servoshell/desktop/csv_file_dialog.rs"]
+mod csv_file_dialog;
 
 #[cfg(test)]
 mod connection_tests {

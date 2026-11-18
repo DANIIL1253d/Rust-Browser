@@ -13,6 +13,8 @@ pub enum Icon {
     StarFilled,
     Menu,
     Plus,
+    Close,
+    YouTube,
     Bookmarks,
     History,
     Search,
@@ -167,6 +169,22 @@ pub fn paint(ui: &Ui, rect: Rect, kind: Icon, color: Color32) {
         Icon::Plus => {
             line(&[(5., 12.), (19., 12.)]);
             line(&[(12., 5.), (12., 19.)]);
+        },
+        Icon::Close => {
+            line(&[(5., 5.), (19., 19.)]);
+            line(&[(19., 5.), (5., 19.)]);
+        },
+        Icon::YouTube => {
+            ui.painter().rect_filled(
+                Rect::from_two_pos(p(1., 4.5), p(23., 19.5)),
+                4.0 * s,
+                Color32::from_rgb(255, 0, 0),
+            );
+            ui.painter().add(egui::Shape::convex_polygon(
+                vec![p(10., 8.), p(16., 12.), p(10., 16.)],
+                Color32::WHITE,
+                Stroke::NONE,
+            ));
         },
         Icon::Bookmarks => {
             line(&[

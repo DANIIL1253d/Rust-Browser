@@ -1,8 +1,9 @@
 //! Native password-manager window; capture/fill is always an explicit action.
 use super::browser;
+use super::csv_file_dialog::{PendingFile, take_picked};
 use crate::window::ServoShellWindow;
 use rust_browser_core::passwords::{
-    CAPTURE_SCRIPT, Credential, export_csv, fill_script, origin, parse_csv,
+    CAPTURE_SCRIPT, Credential, export_csv, origin, parse_csv,
 };
 use std::io::Read;
 use std::sync::mpsc::{self, Receiver};
@@ -19,13 +20,13 @@ pub struct PasswordUi {
     fill: Option<Receiver<bool>>,
     delete: Option<usize>,
     editing: Option<(String, String)>,
-    import_dialog: egui_file_dialog::FileDialog,
-    export_dialog: egui_file_dialog::FileDialog,
+    import_dialog: Option<PendingFile>,
+    export_dialog: Option<PendingFile>,
     pending_import: Option<Vec<Credential>>,
     export_warning: bool,
 }
 impl PasswordUi {
-    pub fn show_manager(&mut self, ctx: &mut egui::Ui, window: Option<&ServoShellWindow>) {
+    pub fn show_manager(&mut self, ctx: &mut egui::Ui, window: Option<&ServoShellWindow>, parent: &winit::window::Window) {
         if let Some(result) = self.capture.as_ref().and_then(|rx| rx.try_recv().ok()) {
             self.capture = None;
             match result {
@@ -68,8 +69,8 @@ impl PasswordUi {
                     self.editing = None; self.password.clear(); self.username.clear(); self.reveal = false; self.site = current_origin_for(&current);
                 }
                 if ui.button("Импорт CSV…").clicked() {
-                    self.import_dialog = egui_file_dialog::FileDialog::new().add_file_filter_extensions("CSV", vec!["csv"]);
-                    self.import_dialog.pick_file();
+                    let future = rfd::AsyncFileDialog::new().set_parent(parent).add_filter("CSV", &["csv"]).pick_file();
+                    self.import_dialog = Some(Box::pin(async move { future.await.map(|file| file.path().to_owned()) }));
                 }
                 if ui.button("Экспорт CSV…").clicked() { self.export_warning = true; }
                 if ui.add_enabled(window.is_some(), egui::Button::new("Взять с текущей страницы")).clicked() {
@@ -82,8 +83,8 @@ impl PasswordUi {
                     ui.horizontal(|ui| {
                         if ui.button("Выбрать файл для экспорта…").clicked() {
                             self.export_warning = false;
-                            self.export_dialog = egui_file_dialog::FileDialog::new().default_file_name("passwords.csv").add_file_filter_extensions("CSV", vec!["csv"]);
-                            self.export_dialog.save_file();
+                            let future = rfd::AsyncFileDialog::new().set_parent(parent).set_file_name("passwords.csv").add_filter("CSV", &["csv"]).save_file();
+                            self.export_dialog = Some(Box::pin(async move { future.await.map(|file| file.path().to_owned()) }));
                         }
                         if ui.button("Отмена").clicked() { self.export_warning = false; }
                     });
@@ -172,9 +173,7 @@ impl PasswordUi {
             ui.separator();
             ui.small("Заполнение только на сохранённом сайте. Вход подтверждается на странице");
         });
-        self.import_dialog.update(ctx);
-        self.export_dialog.update(ctx);
-        if let Some(path) = self.import_dialog.take_picked() {
+        if let Some(path) = take_picked(&mut self.import_dialog) {
             let result = (|| {
                 let file = std::fs::File::open(path).map_err(|_| "Не удалось открыть CSV.")?;
                 let mut bytes = Vec::new();
@@ -191,7 +190,7 @@ impl PasswordUi {
                 Err(error) => self.status = error,
             }
         }
-        if let Some(path) = self.export_dialog.take_picked() {
+        if let Some(path) = take_picked(&mut self.export_dialog) {
             let result = browser::with(|b| export_csv(&b.vault.entries)).and_then(|bytes| {
                 std::fs::write(path, bytes).map_err(|_| "Не удалось сохранить CSV.".into())
             });
@@ -200,7 +199,7 @@ impl PasswordUi {
                 Err(error) => error,
             };
         }
-        if self.capture.is_some() || self.fill.is_some() {
+        if self.capture.is_some() || self.fill.is_some() || self.import_dialog.is_some() || self.export_dialog.is_some() {
             ctx.request_repaint_after(std::time::Duration::from_millis(150));
         }
     }
@@ -227,24 +226,10 @@ impl PasswordUi {
         });
     }
     fn fill_form(&mut self, window: &ServoShellWindow, index: usize) {
-        let Some(view) = window.active_webview() else {
-            return;
-        };
-        let Some(url) = view.url() else {
-            return;
-        };
-        let Some(entry) = browser::with(|b| b.vault.entries.get(index).cloned()) else {
-            return;
-        };
-        match fill_script(url.as_str(), &entry) {
-            Ok(script) => {
-                let (tx, rx) = mpsc::channel();
-                self.fill = Some(rx);
-                view.evaluate_javascript(script, move |v| {
-                    let _ = tx.send(matches!(v, Ok(servo::JSValue::Boolean(true))));
-                });
-            },
-            Err(e) => self.status = e,
+        let (tx, rx) = mpsc::channel();
+        match super::autofill::fill_from_manager(window, index, tx) {
+            Ok(()) => self.fill = Some(rx),
+            Err(error) => self.status = error,
         }
     }
 }

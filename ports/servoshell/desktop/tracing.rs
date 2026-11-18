@@ -58,6 +58,9 @@ mod from_winit {
                     target!("UserEvent(OpenPasswordManager)")
                 },
                 Self::UserEvent(AppEvent::Accessibility(..)) => target!("UserEvent(Accessibility)"),
+                Self::UserEvent(AppEvent::RequestRepaint(..)) => {
+                    target!("UserEvent(RequestRepaint)")
+                },
                 #[cfg(feature = "gamepad")]
                 Self::UserEvent(AppEvent::Gamepad(..)) => target!("UserEvent(Gamepad)"),
                 Self::Suspended => target!("Suspended"),

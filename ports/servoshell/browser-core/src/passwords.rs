@@ -194,24 +194,30 @@ pub fn export_csv(entries: &[Credential]) -> Result<Vec<u8>, String> {
         .map_err(|_| "Не удалось завершить CSV.".into())
 }
 pub fn fill_script(site: &str, entry: &Credential) -> Result<String, String> {
+    fill_script_for_target(site, entry, None)
+}
+
+/// A discovery request contains no saved login or password. The target token binds
+/// the eventual explicit fill to the same document and input element.
+pub fn discovery_script(site: &str, token: &str, focused: bool) -> Result<String, String> {
+    let site = origin(site)?;
+    let args =
+        serde_json::json!({"mode":"discover", "origin":site, "token":token, "focused":focused});
+    Ok(format!("{}({args})", include_str!("autofill.js")))
+}
+
+pub fn fill_script_for_target(
+    site: &str,
+    entry: &Credential,
+    token: Option<&str>,
+) -> Result<String, String> {
     let site = origin(site)?;
     if site != entry.origin {
         return Err("Эта запись сохранена для другого сайта.".into());
     }
-    let args = serde_json::to_string(&(&site, &entry.username, &entry.password))
-        .map_err(|_| "Не удалось заполнить пароль.")?;
-    Ok(format!(
-        r#"(function(a){{
-      if(location.origin!==a[0])return false;
-      var p=Array.from(document.querySelectorAll('input[type="password"]')).find(function(e){{return !e.disabled&&e.offsetParent!==null&&e.autocomplete!=='new-password';}});
-      if(!p)return false;
-      var f=p.form||document;
-      var u=f.querySelector('input[autocomplete="username"],input[type="email"],input[name="username"],input[name="login"],input[type="text"]');
-      var setter=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set;
-      function put(e,v){{setter.call(e,v);e.dispatchEvent(new Event('input',{{bubbles:true}}));e.dispatchEvent(new Event('change',{{bubbles:true}}));}}
-      if(u&&!u.disabled)put(u,a[1]);put(p,a[2]);return true;
-    }})({args})"#
-    ))
+    let args = serde_json::json!({"mode":"fill", "origin":site, "username":entry.username,
+        "password":entry.password, "token":token});
+    Ok(format!("{}({args})", include_str!("autofill.js")))
 }
 
 /// Called only after the user explicitly chooses to read the current login form.
