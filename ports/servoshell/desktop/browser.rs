@@ -2,6 +2,7 @@
 use super::event_loop::AppEvent;
 use crate::running_app_state::RunningAppState;
 use rust_browser_core::passwords::Vault;
+use rust_browser_core::profile_store::ProfileStore;
 use rust_browser_core::{
     Node, Profile, RouteMode, parse_subscription, proxy_config, secrets, subscription_input,
 };
@@ -123,6 +124,7 @@ pub struct Browser {
     pub vault_error: Option<String>,
     vault_writable: bool,
     writable: bool,
+    profile_store: ProfileStore,
     import: Option<Receiver<Result<Vec<Node>, String>>>,
     connecting: Option<Receiver<ProxyResult>>,
     running: Option<RunningProxy>,
@@ -134,10 +136,13 @@ pub struct Browser {
 }
 impl Browser {
     fn load() -> Self {
-        let (profile, error, writable) = match Profile::load(&profile_dir().join("profile.json")) {
+        let profile_path = profile_dir().join("profile.json");
+        let (profile, error, writable) = match Profile::load(&profile_path) {
             Ok(p) => (p, None, true),
             Err(e) => (Profile::default(), Some(e), false),
         };
+        let saved_profile = (writable && profile_path.is_file()).then(|| profile.clone());
+        let profile_store = ProfileStore::new(profile_path, saved_profile);
         let mut selected = 0;
         let (vault, vault_error, vault_writable) =
             match Vault::load(&profile_dir().join("passwords.dat")) {
@@ -160,6 +165,7 @@ impl Browser {
             status: "Прямое соединение".into(),
             error,
             writable,
+            profile_store,
             vault,
             vault_error,
             vault_writable,
@@ -175,7 +181,7 @@ impl Browser {
     }
     pub fn save(&mut self) {
         if self.writable {
-            if let Err(e) = self.profile.save(&profile_dir().join("profile.json")) {
+            if let Err(e) = self.profile_store.flush(&self.profile) {
                 self.error = Some(e);
             }
         }
@@ -210,6 +216,7 @@ impl Browser {
         }
         let result = import_brave_candidate(&self.profile).and_then(|(next, status)| {
             save_imported_profile(&next)?;
+            self.profile_store.accept_saved(&next);
             self.profile = next;
             Ok(status)
         });

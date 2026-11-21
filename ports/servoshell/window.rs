@@ -12,8 +12,8 @@ use servo::{
     AuthenticationRequest, BluetoothDeviceSelectionRequest, ConsoleLogLevel,
     CreateNewWebViewRequest, Cursor, DeviceIndependentIntRect, DeviceIndependentPixel,
     DeviceIntPoint, DeviceIntSize, DevicePixel, EmbedderControl, EmbedderControlId, InputEventId,
-    InputEventResult, MediaSessionEvent, PermissionRequest, RenderingContext, ScreenGeometry,
-    WebView, WebViewBuilder, WebViewId,
+    InputEventResult, PermissionRequest, RenderingContext, ScreenGeometry, WebView, WebViewBuilder,
+    WebViewId,
 };
 use url::Url;
 
@@ -54,15 +54,19 @@ pub(crate) struct ServoShellWindow {
     pub(crate) webview_collection: RefCell<WebViewCollection>,
     #[cfg(not(any(target_os = "android", target_env = "ohos")))]
     deferred_tabs: RefCell<rust_browser_core::session::DeferredTabs<WebViewId>>,
+    #[cfg(not(any(target_os = "android", target_env = "ohos")))]
+    pub(crate) autofill: Rc<RefCell<crate::desktop::autofill::Autofill>>,
+    #[cfg(not(any(target_os = "android", target_env = "ohos")))]
+    pub(crate) media_controls: RefCell<crate::desktop::media_controls::MediaControls<WebViewId>>,
     /// A handle to the [`PlatformWindow`] that servoshell is rendering in.
     platform_window: Rc<dyn PlatformWindow>,
     /// Whether or not this window should be closed at the end of the spin of the next event loop.
     close_scheduled: Cell<bool>,
     /// Whether or not the application interface needs to be updated.
-    needs_update: Cell<bool>,
+    needs_update: Rc<Cell<bool>>,
     /// Whether or not Servo needs to repaint its display. Currently this is global
     /// because every `WebView` shares a `RenderingContext`.
-    needs_repaint: Cell<bool>,
+    needs_repaint: Rc<Cell<bool>>,
     /// List of webviews that have favicon textures which are not yet uploaded
     /// to the GPU by egui.
     pending_favicon_loads: RefCell<Vec<WebViewId>>,
@@ -81,6 +85,10 @@ impl ServoShellWindow {
             webview_collection: Default::default(),
             #[cfg(not(any(target_os = "android", target_env = "ohos")))]
             deferred_tabs: Default::default(),
+            #[cfg(not(any(target_os = "android", target_env = "ohos")))]
+            autofill: Default::default(),
+            #[cfg(not(any(target_os = "android", target_env = "ohos")))]
+            media_controls: Default::default(),
             platform_window,
             close_scheduled: Default::default(),
             needs_update: Default::default(),
@@ -183,6 +191,11 @@ impl ServoShellWindow {
         self.needs_repaint.set(true)
     }
 
+    #[cfg(not(any(target_os = "android", target_env = "ohos")))]
+    pub(crate) fn autofill_update_flags(&self) -> (Rc<Cell<bool>>, Rc<Cell<bool>>) {
+        (self.needs_update.clone(), self.needs_repaint.clone())
+    }
+
     #[cfg_attr(target_os = "android", expect(dead_code))]
     pub(crate) fn schedule_close(&self) {
         self.close_scheduled.set(true)
@@ -213,6 +226,8 @@ impl ServoShellWindow {
     }
 
     pub(crate) fn activate_webview(&self, webview_id: WebViewId) {
+        #[cfg(not(any(target_os = "android", target_env = "ohos")))]
+        if self.active_webview().is_none_or(|v| v.id() != webview_id) { self.autofill.borrow_mut().invalidate(); }
         #[cfg(not(any(target_os = "android", target_env = "ohos")))]
         log::debug!("Selecting tab: deferred={}, target={}", self.is_deferred(webview_id), self.has_restoring_target(webview_id));
         #[cfg(not(any(target_os = "android", target_env = "ohos")))]
@@ -253,6 +268,8 @@ impl ServoShellWindow {
 
     #[cfg(not(any(target_os = "android", target_env = "ohos")))]
     pub(crate) fn navigate_webview(&self, view: &WebView, url: Url) {
+        self.autofill.borrow_mut().invalidate();
+        self.media_controls.borrow_mut().remove(view.id());
         let page = rust_browser_core::Page { title: url.to_string(), url: url.to_string() };
         let waiting = self.deferred_tabs.borrow_mut().retarget_waiting(view.id(), page.clone());
         if !waiting {
@@ -332,6 +349,10 @@ impl ServoShellWindow {
     /// Note: This can happen because we can trigger a close with a UI action and then get
     /// the close notification via the [`WebViewDelegate`] later.
     pub(crate) fn close_webview(&self, webview_id: WebViewId) {
+        #[cfg(not(any(target_os = "android", target_env = "ohos")))]
+        self.media_controls.borrow_mut().remove(webview_id);
+        #[cfg(not(any(target_os = "android", target_env = "ohos")))]
+        self.autofill.borrow_mut().invalidate();
         let mut webview_collection = self.webview_collection.borrow_mut();
         let Some(closed) = webview_collection.remove(webview_id) else {
             return;
@@ -403,6 +424,12 @@ impl ServoShellWindow {
         webview: WebView,
         embedder_control: EmbedderControl,
     ) {
+        #[cfg(not(any(target_os = "android", target_env = "ohos")))]
+        if self.platform_window.as_headed_window().is_some_and(|w| !w.is_password_manager()) {
+            if let EmbedderControl::InputMethod(control) = &embedder_control {
+                if !control.multiline() { crate::desktop::autofill::focused(self, webview.clone(), Some(control.id())); }
+            }
+        }
         self.platform_window
             .show_embedder_control(webview.id(), embedder_control);
         self.set_needs_update();
@@ -599,7 +626,6 @@ pub(crate) trait PlatformWindow {
     ) {
     }
 
-    fn notify_media_session_event(&self, _: MediaSessionEvent) {}
     fn notify_crashed(&self, _: WebView, _reason: String, _backtrace: Option<String>) {}
     fn show_console_message(&self, _level: ConsoleLogLevel, _message: &str) {}
 

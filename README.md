@@ -1,60 +1,76 @@
-<p align="center"><img src="design/logo.svg" width="72" alt="Rust Browser logo"></p>
+<p align="center"><img src="design/logo.svg" width="72" alt="Логотип Rust Browser"></p>
 <h1 align="center">Rust Browser</h1>
-<p align="center">A native Rust browser built on Servo</p>
+<p align="center">Нативный браузер на Rust и Servo</p>
 
-![Browser preview](browser-preview.png)
+![Интерфейс браузера](browser-preview.png)
 
-Rust Browser is an experimental Windows desktop browser with familiar tabbed
-navigation, a local profile, adaptive connection routing and a native password
-manager. The interface uses quiet graphite surfaces, a configurable accent and
-optional translucent menus. This repository remains private during development.
+Rust Browser — экспериментальный браузер для Windows с привычными вкладками,
+локальным профилем, выбором маршрута подключения и нативным менеджером паролей.
+Интерфейс оформлен в графитовых тонах; цвет акцента и прозрачность меню можно
+настроить. Во время разработки репозиторий остаётся закрытым.
 
-## Features
+## Возможности
 
-- Integrated Servo engine, tabs, navigation, bookmarks, history and lazy session restoration
-- Dark/light chrome, accent colors, compact navigation and optional glass effects
-- Direct, automatic and proxy-only routing, with domain exceptions
-- Local subscription import: VLESS, VMess, Trojan, Shadowsocks and XHTTP via Xray
-- DPAPI-encrypted password vault in a separate native window
-- CSV password import/export and read-only Brave bookmark/history import
-- Search open tabs with Ctrl+Shift+A and reopen a closed tab with Ctrl+Shift+T
-- Connection details from actual main-document TLS evidence, with explicit HTTP/error states
-- Event-driven rendering: delayed UI timers do not cause a continuous repaint loop
+- Движок Servo, вкладки, навигация, закладки, история и отложенное восстановление сессии
+- Светлая и тёмная темы панелей, цвета акцента, компактная навигация и полупрозрачные меню
+- Прямое подключение, автоматический выбор маршрута и режим только через подписку с исключениями для доменов
+- Локальный импорт подписок: VLESS, VMess, Trojan, Shadowsocks и XHTTP через Xray
+- Хранилище паролей с шифрованием DPAPI в отдельном нативном окне
+- Импорт и экспорт паролей через CSV; чтение закладок и истории Brave без изменения его профиля
+- Выбор сохранённой учётной записи для форм входа, включая отдельный шаг с почтой
+- Общее меню управления воспроизведением из разных вкладок
+- Медиабэкенд GStreamer для обычных аудио- и видеофайлов
+- Поиск открытых вкладок по Ctrl+Shift+A и возврат закрытой вкладки по Ctrl+Shift+T
+- Сведения о соединении по фактической TLS-проверке основной страницы, отдельные состояния HTTP и ошибки
+- Перерисовка по событиям: отложенные таймеры интерфейса не запускают постоянный цикл обновления
 
-Saved background tabs load when selected. The selected page loads at startup;
-tab order, intended URLs and titles remain available before loading.
+При запуске загружается выбранная страница. Остальные сохранённые вкладки
+загружаются при выборе; их порядок, адреса и названия доступны заранее.
 
-## Run
+## Запуск
 
-For a locally packaged build, run `Start-Browser.cmd`. Keep the application bundle's
-`resources` and `runtime` folders beside `RustBrowser.exe`. Downloads of network
-cores are separate from source control and verified against pinned SHA-256 hashes.
+После сборки и упаковки запусти `Start-Browser.cmd`. Папки `resources` и `runtime`
+должны оставаться рядом с `RustBrowser.exe`. Сетевые ядра скачиваются отдельно,
+не входят в репозиторий и проверяются по зафиксированным SHA-256.
 
-Your profile is stored in `%LOCALAPPDATA%\RustBrowser`. Profile data, authentication
-material and subscription keys are never part of this repository.
+Профиль хранится в `%LOCALAPPDATA%\RustBrowser`. Данные профиля, сведения для входа
+и ключи подписок не входят в репозиторий.
 
-## Build on Windows
+## Сборка в Windows
 
-Requirements: Rust stable, Visual Studio C++ tools with Windows SDK, and Python
-3.11 or newer. Start PowerShell in the repository and use your Python executable:
+Понадобятся Rust stable, инструменты C++ из Visual Studio с Windows SDK и Python
+3.11 или новее. Открой PowerShell в репозитории и укажи путь к своему Python:
 
 ```powershell
 .\Setup-BuildTools.ps1 -PythonPath C:\Path\To\python.exe
+.\Setup-MediaTools.ps1
 .\Download-NetworkCores.ps1
 .\Build-Browser.ps1 -PythonPath C:\Path\To\python.exe
 .\Package-Browser.ps1
 .\Start-Browser.cmd
 ```
 
-Build caches use `.build` by default. `RUST_BROWSER_WORK` overrides that directory.
-The GitHub repository contains all browser modifications as an overlay. On the
-first build, Initialize-ServoSource.ps1 downloads Servo v0.7.0 at the pinned
-revision and applies BROWSER-OVERLAY.json inside the generated build workspace.
-Upstream code remains available from its official repository; third-party
-notices are retained. This avoids vendoring the large upstream WPT corpus.
-For an optimized build pass `-Release` to both build and packaging scripts.
+По умолчанию кэш сборки находится в `.build`; переменная `RUST_BROWSER_WORK`
+позволяет выбрать другую папку. В GitHub хранятся изменения браузера в виде
+набора файлов поверх Servo. При первой сборке `Initialize-ServoSource.ps1`
+скачивает Servo v0.8.0 на зафиксированной ревизии и применяет
+`BROWSER-OVERLAY.json` в созданной рабочей папке сборки. Исходный код Servo
+доступен в официальном репозитории, уведомления сторонних компонентов сохранены.
+Такая схема позволяет не включать в репозиторий большой набор тестов WPT.
+Для оптимизированной сборки передай `-Release` скриптам сборки и упаковки.
 
-## Verify
+## Проверки
+
+Чтобы собрать чистый комплект из проверенного распакованного пакета и исходников:
+
+```powershell
+python tools/export_distribution.py --package C:\Builds\verified-candidate --output C:\Builds\RustBrowser
+```
+
+Пакет должен содержать `candidate-manifest.json` с SHA-256 приложения. Команда
+создаёт новую папку с `app`, `source` и запуском. Копируются только файлы из
+манифестов; личный профиль, кэш, локальные отчёты и история Git не переносятся.
+Существующая папка назначения сохраняется без изменений.
 
 ```powershell
 .\Build-Browser.ps1 -CoreTests -PythonPath C:\Path\To\python.exe
@@ -62,44 +78,52 @@ For an optimized build pass `-Release` to both build and packaging scripts.
 .\Build-Browser.ps1 -NetworkTests -PythonPath C:\Path\To\python.exe
 ```
 
-CI checks profiles, subscriptions, DPAPI, CSV behavior and UI scheduling. Full desktop
-builds and site compatibility require separate validation; see [TESTING.md](TESTING.md).
+CI проверяет профили, подписки, DPAPI, работу с CSV и планирование перерисовки.
+Полная сборка приложения и совместимость сайтов проверяются отдельно;
+подробнее в [TESTING.md](TESTING.md).
 
-Create a distribution after packaging with `Release-Browser.ps1 -Version v0.1.0`.
-It produces a ZIP and SHA-256 checksums from a fresh application bundle, excluding
-profiles and local development files. See [RELEASE-NOTES.md](RELEASE-NOTES.md).
+После оптимизированной сборки запусти `Release-Browser.ps1 -Version v0.1.1`, чтобы
+подготовить следующий дистрибутив. Скрипт создаёт ZIP и контрольные суммы SHA-256
+из сборки Release, без профилей и локальных файлов разработки. Установщик
+создаётся отдельно через `Build-Installer.ps1`. См. [проверки](TESTING.md).
 
-## Status
+## Состояние проекта
 
-This is a development browser, not a Chromium-compatible release. Chrome extensions,
-Brave Shields, DRM and the media backend are not implemented in this build. A live
-subscription must be imported locally before restricted sites can use it. Arbitrary
-websites and unlimited tabs cannot be guaranteed to stay below 500 MB.
+Браузер находится в разработке, совместимость Servo отличается от Chromium.
+Расширения Chrome, Brave Shields и DRM пока не реализованы.
+В текущем коде проверено декодирование WAV, VP8/WebM и H.264/MP4, включая
+перемотку и паузу. Потоковый MediaSource остаётся экспериментальным и по
+умолчанию выключен; его состояние описано в [контракте MSE](tests/browser-mse/README.md).
+Чтобы использовать подписку для доступа к ограниченным сайтам, её нужно
+импортировать локально. Потребление памяти зависит от сайтов и числа вкладок;
+постоянный расход ниже 500 МБ не гарантируется.
 
-The supported Brave importer transfers bookmarks and up to 10,000 history
-entries. Active authenticated sessions/cookies are not imported. Passwords can be
-transferred using the native manager's explicit CSV workflow.
+Импорт из Brave переносит закладки и до 10 000 записей истории. Cookies и активные
+входы в аккаунты не переносятся. Пароли можно перенести отдельно через CSV
+в нативном менеджере паролей.
 
-Close Rust Browser before running `app/RustBrowser.exe --import-brave` for the
-profile-only import. It creates a local profile backup and never opens the vault.
+Для импорта профиля из командной строки закрой Rust Browser и запусти
+`app/RustBrowser.exe --import-brave`. Команда создаёт локальную резервную копию
+профиля и не открывает хранилище паролей.
 
-## Project
+## О проекте
 
-- [Roadmap](ROADMAP.md)
-- [Contributing](CONTRIBUTING-BROWSER.md)
-- [Russian usage guide](README-BROWSER.md)
-- [Contributors](CONTRIBUTORS.md)
-- [Testing](TESTING.md)
-- [Release notes](RELEASE-NOTES.md)
+- [Планы развития](ROADMAP.md)
+- [Участие в разработке](CONTRIBUTING-BROWSER.md)
+- [Руководство пользователя](README-BROWSER.md)
+- [Участники](CONTRIBUTORS.md)
+- [Тестирование](TESTING.md)
+- [Описание выпуска](RELEASE-NOTES.md)
 
-## Upstream and credits
+## Основа и благодарности
 
-Built from [Servo](https://github.com/servo/servo) v0.7.0, baseline
-`aac43a3f31a259f04a574f5ec4e959c943ad7cc7`. Upstream source notices and
-[MPL-2.0](LICENSE) are preserved. Original Servo documentation is retained in
-[docs/UPSTREAM-SERVO-README.md](docs/UPSTREAM-SERVO-README.md).
+Проект основан на [Servo](https://github.com/servo/servo) v0.8.0, ревизия
+`4e136d8ef31b7c4748fbfac606ca463f3efd7537`. Уведомления об авторских правах
+и лицензия [MPL-2.0](LICENSE) сохранены. Исходное руководство Servo доступно
+в [docs/UPSTREAM-SERVO-README.md](docs/UPSTREAM-SERVO-README.md).
 
-Design workflow: [unslop](https://github.com/heydamir/unslop) by **Damir Sokolovsky
-(@heydamir)**, CC BY 4.0. Line icons follow Lucide; attribution is in `design`.
-sing-box and Xray run as separate processes; their sources, licenses and hashes
-are documented in `runtime/THIRD-PARTY.txt`.
+В работе над оформлением использован [unslop](https://github.com/heydamir/unslop)
+от **Damir Sokolovsky (@heydamir)**, CC BY 4.0. Линейные значки основаны на Lucide;
+сведения об авторах находятся в `design`. sing-box и Xray запускаются отдельными
+процессами; их исходники, лицензии и контрольные суммы указаны
+в `runtime/THIRD-PARTY.txt`.

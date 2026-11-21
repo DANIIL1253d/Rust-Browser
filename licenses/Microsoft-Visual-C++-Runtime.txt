@@ -1,0 +1,14 @@
+Microsoft Visual C++ Runtime
+Copyright Microsoft Corporation. All rights reserved.
+
+The Windows package includes the x64 redistributable CRT DLLs required by the
+application and its native dependencies. They are copied from the Visual Studio
+2022 licensed Redistributable directory, not from Windows/System32.
+
+These binaries remain subject to Microsoft's software license terms; Rust
+Browser's source license does not relicense them.
+
+Redistribution and app-local deployment documentation:
+https://learn.microsoft.com/cpp/windows/redistributing-visual-cpp-files
+https://learn.microsoft.com/visualstudio/releases/2022/redistribution
+https://visualstudio.microsoft.com/license-terms/

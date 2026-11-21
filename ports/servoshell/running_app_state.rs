@@ -28,14 +28,15 @@ use log::{error, info, warn};
     not(any(target_os = "android", target_env = "ohos"))
 ))]
 use servo::GamepadIndex;
+use servo::MediaSessionEvent;
 use servo::{
     AllowOrDenyRequest, AuthenticationRequest, BluetoothDeviceSelectionRequest, CSSPixel,
     ConsoleLogLevel, CreateNewWebViewRequest, DeviceIntPoint, DeviceIntSize, EmbedderControl,
     EmbedderControlId, EventLoopWaker, GenericSender, InputEvent, InputEventId, InputEventResult,
-    JSValue, LoadStatus, MediaSessionEvent, PermissionRequest, PrefValue, Preferences,
-    ScreenshotCaptureError, Servo, ServoDelegate, ServoError, TraversalId, UserContentManager,
-    WebDriverCommandMsg, WebDriverJSResult, WebDriverLoadStatus, WebDriverScriptCommand,
-    WebDriverSenders, WebView, WebViewDelegate, WebViewId,
+    JSValue, LoadStatus, PermissionRequest, PrefValue, Preferences, ScreenshotCaptureError, Servo,
+    ServoDelegate, ServoError, TraversalId, UserContentManager, WebDriverCommandMsg,
+    WebDriverJSResult, WebDriverLoadStatus, WebDriverScriptCommand, WebDriverSenders, WebView,
+    WebViewDelegate, WebViewId,
 };
 use url::Url;
 
@@ -675,7 +676,7 @@ impl RunningAppState {
         self.platform_window_for_webview(&webview)
             .dismiss_embedder_controls_for_webview(webview_id);
 
-        info!("Loading URL in webview {}: {}", webview_id, url);
+        info!("WebDriver navigation started in webview {}", webview_id);
         self.set_load_status_sender(webview_id, load_status_sender);
         webview.load(url);
     }
@@ -757,7 +758,12 @@ impl WebViewDelegate for RunningAppState {
 
     fn notify_history_changed(&self, webview: WebView, _entries: Vec<Url>, _current: usize) {
         #[cfg(not(any(target_os = "android", target_env = "ohos")))]
-        self.window_for_webview(&webview).commit_deferred_navigation(&webview);
+        {
+            let window = self.window_for_webview(&webview);
+            window.autofill.borrow_mut().invalidate();
+            window.media_controls.borrow_mut().document_changed(webview.id(), webview.document_generation());
+            window.commit_deferred_navigation(&webview);
+        }
         self.window_for_webview(&webview).set_needs_update();
     }
 
@@ -844,18 +850,31 @@ impl WebViewDelegate for RunningAppState {
     fn notify_load_status_changed(&self, webview: WebView, status: LoadStatus) {
         self.window_for_webview(&webview).set_needs_update();
 
-        if status == LoadStatus::Complete {
-            log::debug!("Tab load completed: URL present={}", webview.url().is_some());
-            if let Some(sender) = self
-                .webdriver_senders
-                .borrow_mut()
-                .load_status_senders
-                .remove(&webview.id())
-            {
-                let _ = sender.send(WebDriverLoadStatus::Complete);
+        #[cfg(not(any(target_os = "android", target_env = "ohos")))]
+        {
+            let window = self.window_for_webview(&webview);
+            if status == LoadStatus::Started { window.autofill.borrow_mut().invalidate(); }
+            if status == LoadStatus::Started { window.media_controls.borrow_mut().remove(webview.id()); }
+            if status == LoadStatus::Complete && window.platform_window().as_headed_window().is_some_and(|w| !w.is_password_manager()) {
+                crate::desktop::autofill::focused(&window, webview.clone(), None);
             }
-            self.maybe_request_screenshot(webview);
         }
+
+        let webdriver_status = match status {
+            LoadStatus::Complete => WebDriverLoadStatus::Complete,
+            LoadStatus::Stopped => WebDriverLoadStatus::NavigationStop,
+            _ => return,
+        };
+
+        if let Some(sender) = self
+            .webdriver_senders
+            .borrow_mut()
+            .load_status_senders
+            .remove(&webview.id())
+        {
+            let _ = sender.send(webdriver_status);
+        }
+        self.maybe_request_screenshot(webview);
     }
 
     fn notify_connection_changed(&self, webview: WebView, _info: servo::ConnectionInfo) {
@@ -928,8 +947,8 @@ impl WebViewDelegate for RunningAppState {
     }
 
     fn notify_media_session_event(&self, webview: WebView, event: MediaSessionEvent) {
-        self.platform_window_for_webview(&webview)
-            .notify_media_session_event(event);
+        #[cfg(not(any(target_os = "android", target_env = "ohos")))]
+        crate::desktop::media_controls::received(&self.window_for_webview(&webview), &webview, &event);
     }
 
     fn notify_crashed(&self, webview: WebView, reason: String, backtrace: Option<String>) {
