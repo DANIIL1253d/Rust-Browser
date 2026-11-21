@@ -5,7 +5,6 @@
 //! An event loop implementation that works in headless mode.
 
 use std::sync::{Arc, Condvar, Mutex};
-use std::task::Wake;
 use std::time;
 
 #[cfg(feature = "gamepad")]
@@ -17,7 +16,6 @@ use servo::GamepadIndex;
 use winit::event_loop::{EventLoop, EventLoop as WinitEventLoop, EventLoopProxy};
 
 use super::app::App;
-use crate::window::ServoShellWindowId;
 
 #[derive(Debug)]
 pub enum AppEvent {
@@ -27,7 +25,6 @@ pub enum AppEvent {
     GuiRepaint(crate::window::ServoShellWindowId, std::time::Duration),
     OpenPasswordManager(crate::window::ServoShellWindowId),
     Accessibility(egui_winit::accesskit_winit::Event),
-    RequestRepaint(ServoShellWindowId),
     #[cfg(feature = "gamepad")]
     Gamepad(Event, String, GamepadIndex),
 }
@@ -172,24 +169,5 @@ impl EventLoopWaker for HeadlessEventLoopWaker {
 
     fn clone_box(&self) -> Box<dyn EventLoopWaker> {
         Box::new(self.clone())
-    }
-}
-
-pub(crate) struct RepaintEventLoopWaker {
-    proxy: EventLoopProxy<AppEvent>,
-    window_id: ServoShellWindowId,
-}
-
-impl RepaintEventLoopWaker {
-    pub(crate) fn new(proxy: EventLoopProxy<AppEvent>, window_id: ServoShellWindowId) -> Self {
-        Self { proxy, window_id }
-    }
-}
-
-impl Wake for RepaintEventLoopWaker {
-    fn wake(self: Arc<Self>) {
-        let _ = self
-            .proxy
-            .send_event(AppEvent::RequestRepaint(self.window_id));
     }
 }

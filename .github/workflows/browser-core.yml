@@ -21,8 +21,8 @@ jobs:
             .build/servo-source -> target
             tests/browser-ui -> target
       - name: Profiles, subscriptions, DPAPI and password imports
-        run: cargo +stable test --locked --manifest-path .build/servo-source/ports/servoshell/browser-core/Cargo.toml
+        run: cargo +stable test --manifest-path .build/servo-source/ports/servoshell/browser-core/Cargo.toml
       - name: UI scheduling regressions
-        run: cargo +stable test --locked --manifest-path tests/browser-ui/Cargo.toml
+        run: cargo +stable test --manifest-path tests/browser-ui/Cargo.toml
     env:
       CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_LINKER: link.exe

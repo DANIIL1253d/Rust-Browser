@@ -33,50 +33,6 @@ kernel.GetProcessTimes.argtypes = [w.HANDLE] + [c.POINTER(w.FILETIME)] * 4
 psapi.GetProcessMemoryInfo.argtypes = [w.HANDLE, c.POINTER(Memory), w.DWORD]
 
 
-class JobLimits(c.Structure):
-    _fields_ = [("process_time", c.c_longlong), ("job_time", c.c_longlong),
-                ("flags", w.DWORD), ("min_working_set", c.c_size_t),
-                ("max_working_set", c.c_size_t), ("active_process_limit", w.DWORD),
-                ("affinity", c.c_size_t), ("priority", w.DWORD), ("scheduling", w.DWORD)]
-
-
-class JobExtendedLimits(c.Structure):
-    _fields_ = [("basic", JobLimits), ("io_counters", c.c_ulonglong * 6),
-                ("process_memory", c.c_size_t), ("job_memory", c.c_size_t),
-                ("peak_process_memory", c.c_size_t), ("peak_job_memory", c.c_size_t)]
-
-
-class OwnedJob:
-    """Close only processes assigned to this test's Windows job, without PID reuse.
-
-    https://learn.microsoft.com/windows/win32/procthread/job-objects
-    The handle stays private and non-inheritable. Child processes inherit the job.
-    """
-    def __init__(self):
-        kernel.CreateJobObjectW.argtypes = [c.c_void_p, w.LPCWSTR]
-        kernel.CreateJobObjectW.restype = w.HANDLE
-        kernel.SetInformationJobObject.argtypes = [w.HANDLE, c.c_int, c.c_void_p, w.DWORD]
-        kernel.AssignProcessToJobObject.argtypes = [w.HANDLE, w.HANDLE]
-        self.handle = kernel.CreateJobObjectW(None, None)
-        if not self.handle:
-            raise c.WinError(c.get_last_error())
-        limits = JobExtendedLimits()
-        limits.basic.flags = 0x2000  # JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
-        if not kernel.SetInformationJobObject(self.handle, 9, c.byref(limits), c.sizeof(limits)):
-            error = c.WinError(c.get_last_error())
-            self.close()
-            raise error
-
-    def assign(self, process):
-        if not kernel.AssignProcessToJobObject(self.handle, int(process._handle)):
-            raise c.WinError(c.get_last_error())
-
-    def close(self):
-        if self.handle:
-            kernel.CloseHandle(self.handle)
-            self.handle = None
-
-
 def process_tree(root):
     snapshot = kernel.CreateToolhelp32Snapshot(2, 0)
     if snapshot == w.HANDLE(-1).value:

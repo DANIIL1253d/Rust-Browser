@@ -39,7 +39,6 @@ use webrender_api::units::{DeviceIntRect, DevicePixel, DevicePoint, DeviceSize};
 use crate::clipboard_delegate::{ClipboardDelegate, DefaultClipboardDelegate};
 #[cfg(feature = "gamepad")]
 use crate::gamepad_delegate::{DefaultGamepadDelegate, GamepadDelegate};
-use crate::geolocation_delegate::{DefaultGeolocationDelegate, GeolocationDelegate};
 use crate::responders::AutomaticResponder;
 use crate::servo::PendingHandledInputEvent;
 use crate::webview_delegate::{CreateNewWebViewRequest, DefaultWebViewDelegate, WebViewDelegate};
@@ -103,7 +102,6 @@ pub(crate) struct WebViewInner {
     pub(crate) clipboard_delegate: Rc<dyn ClipboardDelegate>,
     #[cfg(feature = "gamepad")]
     pub(crate) gamepad_delegate: Rc<dyn GamepadDelegate>,
-    pub(crate) geolocation_delegate: Rc<dyn GeolocationDelegate>,
 
     /// AccessKit subtree id for this [`WebView`], if accessibility is active.
     ///
@@ -130,9 +128,6 @@ pub(crate) struct WebViewInner {
     hidpi_scale_factor: Scale<f32, DeviceIndependentPixel, DevicePixel>,
     load_status: LoadStatus,
     connection_info: embedder_traits::ConnectionTracker<PipelineId>,
-    document_pipeline: Option<PipelineId>,
-    document_generation: u64,
-    media_pipeline: Option<PipelineId>,
     status_text: Option<String>,
     page_title: Option<String>,
     favicon: Option<Image>,
@@ -176,9 +171,6 @@ impl WebView {
             gamepad_delegate: builder
                 .gamepad_delegate
                 .unwrap_or_else(|| Rc::new(DefaultGamepadDelegate)),
-            geolocation_delegate: builder
-                .geolocation_delegate
-                .unwrap_or_else(|| Rc::new(DefaultGeolocationDelegate)),
             accesskit_tree_id: None,
             grafted_accesskit_tree_id: None,
             grafted_accesskit_tree_epoch: None,
@@ -186,9 +178,6 @@ impl WebView {
             hidpi_scale_factor: builder.hidpi_scale_factor,
             load_status: LoadStatus::Started,
             connection_info: Default::default(),
-            document_pipeline: None,
-            document_generation: 0,
-            media_pipeline: None,
             status_text: None,
             page_title: None,
             favicon: None,
@@ -316,11 +305,6 @@ impl WebView {
         self.inner().gamepad_delegate.clone()
     }
 
-    /// Get the [`GeolocationDelegate`] associated with this [`WebView`].
-    pub fn geolocation_delegate(&self) -> Rc<dyn GeolocationDelegate> {
-        self.inner().geolocation_delegate.clone()
-    }
-
     /// Get the unique identifier for this [`WebView`].
     pub fn id(&self) -> WebViewId {
         self.inner().id
@@ -337,32 +321,6 @@ impl WebView {
     /// to changes in the load status.
     pub fn load_status(&self) -> LoadStatus {
         self.inner().load_status
-    }
-
-    /// Identity of the committed document; same-document history keeps its value.
-    pub fn document_generation(&self) -> u64 {
-        self.inner().document_generation
-    }
-
-    pub(crate) fn notify_media_session_event(self, document: PipelineId, source: PipelineId, event: embedder_traits::MediaSessionEvent) {
-        use embedder_traits::{MediaSessionEvent, MediaSessionPlaybackState};
-        let source_changed = {
-            let mut inner = self.inner_mut();
-            if inner.document_pipeline != Some(document) { return; }
-            let previous = inner.media_pipeline;
-            if matches!(&event, MediaSessionEvent::PlaybackStateChange(MediaSessionPlaybackState::None_)) {
-                if previous != Some(source) { return; }
-                inner.media_pipeline = None;
-            } else {
-                inner.media_pipeline = Some(source);
-            }
-            previous.is_some_and(|previous| previous != source)
-        };
-        if source_changed {
-            self.delegate().notify_media_session_event(self.clone(),
-                MediaSessionEvent::PlaybackStateChange(MediaSessionPlaybackState::None_));
-        }
-        self.delegate().notify_media_session_event(self.clone(), event);
     }
 
     pub(crate) fn set_load_status(self, new_value: LoadStatus) {
@@ -701,11 +659,9 @@ impl WebView {
 
     /// Notify this [`WebView`] about a media session event (e.g. play, pause, next track).
     pub fn notify_media_session_action_event(&self, event: MediaSessionActionType) {
-        let Some(document) = self.inner().document_pipeline else { return; };
-        let Some(source) = self.inner().media_pipeline else { return; };
         self.servo()
             .constellation_proxy()
-            .send(EmbedderToConstellationMessage::MediaSessionAction(self.id(), document, source, event));
+            .send(EmbedderToConstellationMessage::MediaSessionAction(event));
     }
 
     /// Set the page zoom of the [`WebView`]. This sets the final page zoom value of the
@@ -833,11 +789,6 @@ impl WebView {
     pub(crate) fn set_history(self, new_back_forward_list: Vec<ServoUrl>, new_index: usize, pipeline: PipelineId) {
         {
             let mut inner_mut = self.inner_mut();
-            if inner_mut.document_pipeline != Some(pipeline) {
-                inner_mut.document_pipeline = Some(pipeline);
-                inner_mut.document_generation = inner_mut.document_generation.wrapping_add(1);
-                inner_mut.media_pipeline = None;
-            }
             inner_mut.connection_info.select(pipeline);
             inner_mut.back_forward_list_index = new_index;
             inner_mut.back_forward_list = new_back_forward_list
@@ -1064,25 +1015,6 @@ impl WebView {
         );
     }
 
-    /// After a new tree has been grafted, move focus to the graft node so that the grafted tree's
-    /// focused node becomes the focused node for the webview.
-    fn move_accessibility_focus_to_graft_node(&self) {
-        let Some(webview_accesskit_tree_id) = self.inner().accesskit_tree_id else {
-            return;
-        };
-        let graft_node_id = NodeId(1);
-
-        self.delegate().notify_accessibility_tree_update(
-            self.clone(),
-            TreeUpdate {
-                nodes: vec![],
-                tree: None,
-                tree_id: webview_accesskit_tree_id,
-                focus: graft_node_id,
-            },
-        );
-    }
-
     pub(crate) fn process_accessibility_tree_update(&self, tree_update: TreeUpdate, epoch: Epoch) {
         if self
             .inner()
@@ -1100,19 +1032,9 @@ impl WebView {
             .grafted_accesskit_tree_epoch
             .is_none_or(|current| epoch > current)
         {
-            // This three-step process is necessary because we need the graft node to be the focused
-            // node in the WebView's accessibility tree, but we can't make it the focused node until
-            // the graft is completed by sending the initial tree update for the new tree.
             self.notify_document_accessibility_tree_id(tree_update.tree_id);
             self.inner_mut().grafted_accesskit_tree_epoch = Some(epoch);
-
-            self.delegate()
-                .notify_accessibility_tree_update(self.clone(), tree_update);
-
-            self.move_accessibility_focus_to_graft_node();
-            return;
         }
-
         self.delegate()
             .notify_accessibility_tree_update(self.clone(), tree_update);
     }
@@ -1170,7 +1092,6 @@ pub struct WebViewBuilder {
     clipboard_delegate: Option<Rc<dyn ClipboardDelegate>>,
     #[cfg(feature = "gamepad")]
     gamepad_delegate: Option<Rc<dyn GamepadDelegate>>,
-    geolocation_delegate: Option<Rc<dyn GeolocationDelegate>>,
 }
 
 impl WebViewBuilder {
@@ -1190,7 +1111,6 @@ impl WebViewBuilder {
             clipboard_delegate: None,
             #[cfg(feature = "gamepad")]
             gamepad_delegate: None,
-            geolocation_delegate: None,
         }
     }
 
@@ -1246,16 +1166,6 @@ impl WebViewBuilder {
     #[cfg(feature = "gamepad")]
     pub fn gamepad_delegate(mut self, gamepad_delegate: Rc<dyn GamepadDelegate>) -> Self {
         self.gamepad_delegate = Some(gamepad_delegate);
-        self
-    }
-
-    /// Set the [`GeolocationDelegate`] for the `WebView` being created. The same
-    /// [`GeolocationDelegate`] can be shared among multiple `WebView`s.
-    pub fn geolocation_delegate(
-        mut self,
-        geolocation_delegate: Rc<dyn GeolocationDelegate>,
-    ) -> Self {
-        self.geolocation_delegate = Some(geolocation_delegate);
         self
     }
 

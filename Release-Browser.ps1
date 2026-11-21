@@ -1,8 +1,7 @@
 param(
     [Parameter(Mandatory=$true)][ValidatePattern('^v[0-9]+\.[0-9]+\.[0-9]+(?:-[a-zA-Z0-9.-]+)?$')][string]$Version,
     [string]$OutputDirectory,
-    [ValidatePattern('^[a-fA-F0-9]{40}$')][string]$SourceRevision,
-    [switch]$Development
+    [ValidatePattern('^[a-fA-F0-9]{40}$')][string]$SourceRevision
 )
 $ErrorActionPreference = 'Stop'
 $projectRoot = $PSScriptRoot
@@ -22,16 +21,12 @@ if ((Test-Path -LiteralPath $archive) -or (Test-Path -LiteralPath $checksums)) {
 # application's profile, caches, downloads or other user-created files.
 $stage = Join-Path $taskWork ('release-stage-' + [guid]::NewGuid().ToString('N'))
 $bundle = Join-Path $stage 'app'
-& (Join-Path $projectRoot 'Package-Browser.ps1') -AppDirectory $bundle -Release:(-not $Development) | Out-Null
+& (Join-Path $projectRoot 'Package-Browser.ps1') -AppDirectory $bundle | Out-Null
 $files = [ordered]@{}
 foreach ($file in Get-ChildItem -LiteralPath $bundle -File) {
-    if ($file.Name -in @('RustBrowser.exe','LICENSE-Servo.txt','media-runtime.json') -or $file.Extension -eq '.dll') {
+    if ($file.Name -eq 'RustBrowser.exe' -or $file.Extension -eq '.dll' -or $file.Name -eq 'LICENSE-Servo.txt') {
         $files["app/$($file.Name)"] = $file.FullName
     }
-}
-foreach ($file in Get-ChildItem -LiteralPath (Join-Path $bundle 'licenses') -File -Recurse) {
-    $relative = [IO.Path]::GetRelativePath($bundle, $file.FullName).Replace('\','/')
-    $files["app/$relative"] = $file.FullName
 }
 foreach ($file in Get-ChildItem -LiteralPath (Join-Path $bundle 'resources') -File -Recurse) {
     $relative = [IO.Path]::GetRelativePath($bundle, $file.FullName).Replace('\','/')
@@ -55,9 +50,8 @@ $manifest = [ordered]@{
     version = $Version
     platform = 'windows-x86_64-msvc'
     source_commit = $SourceRevision
-    servo_revision = (Get-Content -LiteralPath (Join-Path $projectRoot 'BROWSER-OVERLAY.json') -Raw | ConvertFrom-Json).revision
-    build_profile = if ($Development) { 'debug' } else { 'release' }
-    media_backend = 'GStreamer'
+    servo_revision = 'aac43a3f31a259f04a574f5ec4e959c943ad7cc7'
+    build_profile = 'development preview; media backend disabled'
     sha256 = $hashes
 } | ConvertTo-Json -Depth 4
 

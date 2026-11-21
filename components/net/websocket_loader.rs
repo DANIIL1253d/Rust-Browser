@@ -124,7 +124,7 @@ fn process_ws_response(
     resource_url: &ServoUrl,
     protocols: &[String],
 ) -> Result<Option<String>, Error> {
-    trace!("WebSocket: stage=handshake-response");
+    trace!("processing websocket http response for {}", resource_url);
     let mut protocol_in_use = None;
     if let Some(protocol_name) = response.headers().get("Sec-WebSocket-Protocol") {
         let protocol_name = protocol_name.to_str().unwrap_or("");
@@ -175,22 +175,16 @@ fn setup_dom_listener(
 
     dom_action_receiver.set_callback(move |message| {
         let dom_action = message.expect("Ws dom_action message to deserialize");
-        trace!("WebSocket: stage=dom-action");
+        trace!("handling WS DOM action: {:?}", dom_action);
         match dom_action {
             WebSocketDomAction::SendMessage(MessageData::Text(data)) => {
-                if sender
-                    .send(DomMsg::Send(Message::Text(data.into())))
-                    .is_err()
-                {
-                    warn!("WebSocket failed: stage=queue-text");
+                if let Err(e) = sender.send(DomMsg::Send(Message::Text(data.into()))) {
+                    warn!("Error sending websocket message: {:?}", e);
                 }
             },
             WebSocketDomAction::SendMessage(MessageData::Binary(data)) => {
-                if sender
-                    .send(DomMsg::Send(Message::Binary(data.into())))
-                    .is_err()
-                {
-                    warn!("WebSocket failed: stage=queue-binary");
+                if let Err(e) = sender.send(DomMsg::Send(Message::Binary(data.into()))) {
+                    warn!("Error sending websocket message: {:?}", e);
                 }
             },
             WebSocketDomAction::Close(code, reason) => {
@@ -198,8 +192,8 @@ fn setup_dom_listener(
                     return;
                 }
                 let frame = code.map(move |c| (c, reason.unwrap_or_default()));
-                if sender.send(DomMsg::Close(frame)).is_err() {
-                    warn!("WebSocket failed: stage=queue-close");
+                if let Err(e) = sender.send(DomMsg::Close(frame)) {
+                    warn!("Error closing websocket: {:?}", e);
                 }
             },
         }
@@ -220,35 +214,35 @@ async fn run_ws_loop(
     loop {
         select! {
             dom_msg = dom_receiver.recv() => {
-                trace!("WebSocket: stage=dom-message");
+                trace!("processing dom msg: {:?}", dom_msg);
                 let dom_msg = match dom_msg {
                     Some(msg) => msg,
                     None => break,
                 };
                 match dom_msg {
                     DomMsg::Send(m) => {
-                        if stream.send(m).await.is_err() {
-                            warn!("WebSocket failed: stage=send");
+                        if let Err(e) = stream.send(m).await {
+                            warn!("error sending websocket message: {:?}", e);
                         }
                     },
                     DomMsg::Close(frame) => {
-                        if stream.close(frame.map(|(code, reason)| {
+                        if let Err(e) = stream.close(frame.map(|(code, reason)| {
                             CloseFrame {
                                 code: code.into(),
                                 reason: reason.into(),
                             }
-                        })).await.is_err() {
-                            warn!("WebSocket failed: stage=close");
+                        })).await {
+                            warn!("error closing websocket: {:?}", e);
                         }
                     },
                 }
             }
             ws_msg = stream.next() => {
-                trace!("WebSocket: stage=receive");
+                trace!("processing WS stream: {:?}", ws_msg);
                 let msg = match ws_msg {
                     Some(Ok(msg)) => msg,
-                    Some(Err(_)) => {
-                        warn!("WebSocket failed: stage=receive");
+                    Some(Err(e)) => {
+                        warn!("Error in WebSocket communication: {:?}", e);
                         let _ = resource_event_sender.send(WebSocketNetworkEvent::Fail);
                         break;
                     },
@@ -261,22 +255,20 @@ async fn run_ws_loop(
                 match msg {
                     Message::Text(s) => {
                         let message = MessageData::Text(s.as_str().to_owned());
-                        if resource_event_sender
+                        if let Err(e) = resource_event_sender
                             .send(WebSocketNetworkEvent::MessageReceived(message))
-                            .is_err()
                         {
-                            warn!("WebSocket failed: stage=notify-text");
+                            warn!("Error sending websocket notification: {:?}", e);
                             break;
                         }
                     }
 
                     Message::Binary(v) => {
                         let message = MessageData::Binary(v.to_vec());
-                        if resource_event_sender
+                        if let Err(e) = resource_event_sender
                             .send(WebSocketNetworkEvent::MessageReceived(message))
-                            .is_err()
                         {
-                            warn!("WebSocket failed: stage=notify-binary");
+                            warn!("Error sending websocket notification: {:?}", e);
                             break;
                         }
                     }
@@ -288,7 +280,7 @@ async fn run_ws_loop(
                             Some(frame) => (frame.reason, Some(frame.code.into())),
                             None => ("".into(), None),
                         };
-                        debug!("WebSocket: stage=peer-close, code={:?}", code);
+                        debug!("Websocket connection closing due to ({:?}) {}", code, reason);
                         let _ = resource_event_sender.send(WebSocketNetworkEvent::Close(
                             code,
                             reason.to_string(),
@@ -316,7 +308,7 @@ pub(crate) async fn start_websocket(
     tls_config: TlsConfig,
     dom_action_receiver: CallbackSetter<WebSocketDomAction>,
 ) -> Result<Response, Error> {
-    trace!("WebSocket: stage=connect");
+    trace!("starting WS connection to {}", client.url());
 
     let initiated_close = Arc::new(AtomicBool::new(false));
     let dom_receiver = setup_dom_listener(dom_action_receiver, initiated_close.clone());
@@ -372,10 +364,10 @@ pub(crate) async fn start_websocket(
             return Ok(response);
         }
 
-        trace!("WebSocket: stage=start-loop");
+        trace!("about to start ws loop for {}", url);
         spawn_task(run_ws_loop(dom_receiver, resource_event_sender, stream));
     } else {
-        trace!("WebSocket: stage=closed-before-loop");
+        trace!("client closed connection for {}, not running loop", url);
     }
     Ok(response)
 }

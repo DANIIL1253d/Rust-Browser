@@ -19,8 +19,8 @@ pub enum ConstellationToEmbedderMsg {
     /// A history traversal operation completed.
     HistoryTraversalComplete(WebViewId, TraversalId),
     /// Notifies the embedder about media session events
-    /// Includes the committed top-level document and source pipeline identities.
-    MediaSessionEvent(WebViewId, PipelineId, PipelineId, MediaSessionEvent),
+    /// (i.e. when there is metadata for the active media session, playback state changes...).
+    MediaSessionEvent(WebViewId, MediaSessionEvent),
     /// A pipeline panicked. First string is the reason, second one is the backtrace.
     Panic(WebViewId, String, Option<String>),
     /// Inform the embedding layer that a particular `InputEvent` was handled by Servo
@@ -40,6 +40,4 @@ pub enum ConstellationToEmbedderMsg {
     AllowNavigationRequest(WebViewId, PipelineId, ServoUrl),
     /// The history state has changed.
     HistoryChanged(WebViewId, Vec<ServoUrl>, usize, PipelineId),
-    /// A pipeline exited, whether cleanly or because its content process died.
-    PipelineExited(PipelineId),
 }

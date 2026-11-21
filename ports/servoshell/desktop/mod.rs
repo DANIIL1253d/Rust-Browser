@@ -6,11 +6,9 @@
 
 mod accelerated_gl_media;
 pub(crate) mod app;
-pub(crate) mod autofill;
 pub(crate) mod browser;
 mod browser_chrome;
 pub(crate) mod cli;
-mod csv_file_dialog;
 pub(crate) mod dialog;
 pub(crate) mod event_loop;
 #[cfg(feature = "gamepad")]
@@ -21,7 +19,6 @@ pub(crate) mod headed_window;
 mod headless_window;
 mod icons;
 mod keyutils;
-pub(crate) mod media_controls;
 mod passwords;
 mod protocols;
 mod repaint;

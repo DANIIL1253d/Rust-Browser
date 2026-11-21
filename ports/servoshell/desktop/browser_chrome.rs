@@ -310,6 +310,15 @@ impl Chrome {
         forward: bool,
         loading: bool,
     ) {
+        browser::with(|b| b.poll(state));
+        ui.ctx()
+            .request_repaint_after(std::time::Duration::from_millis(
+                if browser::with(|b| b.busy()) {
+                    150
+                } else {
+                    3000
+                },
+            ));
         ui.horizontal_centered(|ui| {
             ui.spacing_mut().item_spacing.x = 4.0;
             ui.set_min_height(if browser::with(|b| b.profile.appearance.compact) {
@@ -330,12 +339,11 @@ impl Chrome {
             } else if icon(ui, "↻", "Обновить · Ctrl+R", true).clicked() {
                 window.queue_user_interface_command(UserInterfaceCommand::Reload);
             }
-            super::autofill::key_button(ui, window);
             if icon(ui, "⌂", "Новая вкладка", true).clicked() {
                 window
                     .queue_user_interface_command(UserInterfaceCommand::Go("servo:newtab".into()));
             }
-            let width = (ui.available_width() - 124.0).max(100.0);
+            let width = (ui.available_width() - 80.0).max(100.0);
             egui::Frame::new()
                 .fill(ui.visuals().extreme_bg_color)
                 .corner_radius(10)
@@ -410,7 +418,6 @@ impl Chrome {
                     b.save();
                 });
             }
-            super::media_controls::button(ui, window);
             let menu = ui.menu_button("    ", |ui| {
                 ui.set_min_width(272.0);
                 if icons::menu_row(ui, Icon::Plus, "Новая вкладка", "Ctrl+T").clicked()
@@ -472,7 +479,7 @@ impl Chrome {
                     RouteMode::Proxy if connected => "Все сайты через подписку",
                     _ => "Подписка не подключена",
                 });
-                ui.weak("Rust Browser 0.1 · Servo 0.8");
+                ui.weak("Rust Browser 0.1 · Servo 0.7");
             });
             icons::paint(
                 ui,

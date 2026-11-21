@@ -6,7 +6,6 @@ use serde_json::{Value, json};
 use std::{collections::HashMap, path::Path};
 use url::Url;
 pub mod passwords;
-pub mod profile_store;
 pub mod secrets;
 pub mod session;
 pub const MAX_HISTORY_ENTRIES: usize = 10_000;
@@ -74,7 +73,7 @@ impl Default for Appearance {
     }
 }
 
-#[derive(Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Default, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Profile {
     pub appearance: Appearance,
@@ -87,7 +86,7 @@ pub struct Profile {
     pub direct_domains: String,
     pub proxy_domains: String,
 }
-#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct Page {
     pub title: String,
     pub url: String,

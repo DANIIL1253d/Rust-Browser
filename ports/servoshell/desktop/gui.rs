@@ -22,6 +22,10 @@ use std::sync::Arc;
 
 use accesskit::Affine;
 use dpi::PhysicalSize;
+use egui::{
+    Button, FontDefinitions, Id, Label, LayerId, Order, PaintCallback, Panel, Vec2, WidgetInfo,
+    WidgetType, pos2,
+};
 #[cfg(any(
     target_os = "windows",
     target_os = "linux",
@@ -29,10 +33,6 @@ use dpi::PhysicalSize;
     target_os = "macos"
 ))]
 use egui::{FontData, FontFamily};
-use egui::{
-    FontDefinitions, Id, Label, LayerId, Order, PaintCallback, Panel, Vec2, WidgetInfo, WidgetType,
-    pos2,
-};
 use egui_glow::{CallbackFn, EguiGlow};
 use egui_winit::EventResponse;
 use euclid::{Length, Point2D, Rect, Scale, Size2D};
@@ -96,6 +96,15 @@ pub struct Gui {
     pending_accesskit_updates: Vec<accesskit::TreeUpdate>,
 }
 
+fn truncate_with_ellipsis(input: &str, max_length: usize) -> String {
+    if input.chars().count() > max_length {
+        let truncated: String = input.chars().take(max_length.saturating_sub(1)).collect();
+        format!("{}…", truncated)
+    } else {
+        input.to_string()
+    }
+}
+
 #[cfg(any(
     target_os = "windows",
     target_os = "linux",
@@ -126,10 +135,11 @@ fn load_cjk_fonts(font_candidates: &[(&str, &str)]) -> FontDefinitions {
         }
     }
 
-    if !loaded_font_names.is_empty() &&
-        let Some(proportional) = fonts.families.get_mut(&FontFamily::Proportional)
-    {
-        proportional.append(&mut loaded_font_names);
+    if !loaded_font_names.is_empty() {
+        let proportional = fonts.families.get_mut(&FontFamily::Proportional).unwrap();
+        for font_name in loaded_font_names.iter() {
+            proportional.insert(0, font_name.clone());
+        }
     }
 
     fonts
@@ -319,7 +329,9 @@ impl Gui {
             .min_size(Vec2 { x: 20.0, y: 20.0 })
     }
 
-    /// Draws a fixed-width browser tab and queues the appropriate [`UserInterfaceCommand`]s.
+    /// Draws a browser tab, checking for clicks and queues appropriate [`UserInterfaceCommand`]s.
+    /// Using a custom widget here would've been nice, but it doesn't seem as though egui
+    /// supports that, so we arrange multiple Widgets in a way that they look connected.
     fn browser_tab(
         ui: &mut egui::Ui,
         window: &ServoShellWindow,
@@ -334,147 +346,76 @@ impl Gui {
         let active_bg_color = ui.visuals().widgets.active.weak_bg_fill;
         let active = window.active_webview().map(|webview| webview.id()) == Some(webview.id());
 
-        // Reserve every part of the tab before painting: titles and missing favicons cannot
-        // change its width, and the close target never overlaps the title target.
-        let (_, rect) = ui.allocate_space(Vec2::new(208.0, 30.0));
-        let close_rect = egui::Rect::from_center_size(
-            pos2(rect.right() - 18.0, rect.center().y),
-            Vec2::splat(24.0),
-        );
-        let tab_rect = egui::Rect::from_min_max(rect.min, pos2(close_rect.left(), rect.bottom()));
-        let id = ui.id().with(("browser-tab", webview.id()));
-        let tab = ui.interact(tab_rect, id, egui::Sense::click());
-        tab.widget_info(|| WidgetInfo::selected(WidgetType::SelectableLabel, true, active, &label));
-        let tab = tab.on_hover_ui(|ui| {
-            ui.label(&label);
-            ui.small(&page.url);
-            if deferred {
-                ui.weak("Загрузится при выборе вкладки");
-            }
-        });
-        let close_button = ui
-            .interact(close_rect, id.with("close"), egui::Sense::click())
-            .on_hover_text("Закрыть вкладку · Ctrl+W");
-        close_button
-            .widget_info(|| WidgetInfo::labeled(WidgetType::Button, true, "Закрыть вкладку"));
+        // Setup a tab frame that will contain the favicon, title and close button
+        let mut tab_frame = egui::Frame::NONE.corner_radius(8).begin(ui);
+        {
+            tab_frame.content_ui.add_space(8.0);
 
-        let fill_color = if active || tab.hovered() || close_button.hovered() {
+            let visuals = tab_frame.content_ui.visuals_mut();
+            // Remove the stroke so we don't see the border between the close button and the label
+            visuals.widgets.active.bg_stroke.width = 0.0;
+            visuals.widgets.hovered.bg_stroke.width = 0.0;
+            // Now we make sure the fill color is always the same, irrespective of state, that way
+            // we can make sure that both the label and close button have the same background color
+            visuals.widgets.noninteractive.weak_bg_fill = inactive_bg_color;
+            visuals.widgets.inactive.weak_bg_fill = inactive_bg_color;
+            visuals.widgets.hovered.weak_bg_fill = active_bg_color;
+            visuals.widgets.active.weak_bg_fill = active_bg_color;
+            visuals.selection.bg_fill = active_bg_color;
+            visuals.selection.stroke.color = visuals.widgets.active.fg_stroke.color;
+            visuals.widgets.hovered.fg_stroke.color = visuals.widgets.active.fg_stroke.color;
+
+            // Expansion would also show that they are 2 separate widgets
+            visuals.widgets.active.expansion = 0.0;
+            visuals.widgets.hovered.expansion = 0.0;
+
+            if deferred {
+                let (rect, _) = tab_frame.content_ui.allocate_exact_size(Vec2::splat(16.0), egui::Sense::hover());
+                super::icons::paint(&tab_frame.content_ui, rect, super::icons::Icon::History, tab_frame.content_ui.visuals().weak_text_color());
+            } else if let Some(favicon) = favicon_texture {
+                tab_frame.content_ui.add(
+                    egui::Image::from_texture(favicon)
+                        .fit_to_exact_size(egui::vec2(16.0, 16.0))
+                        .bg_fill(egui::Color32::TRANSPARENT),
+                );
+            }
+
+            let tab = tab_frame
+                .content_ui
+                .add(Button::selectable(
+                    active,
+                    truncate_with_ellipsis(&label, 20),
+                ))
+                .on_hover_ui(|ui| {
+                    ui.label(&label);
+                    ui.small(&page.url);
+                    if deferred { ui.weak("Загрузится при выборе вкладки"); }
+                });
+
+            let close_button = tab_frame
+                .content_ui
+                .add(egui::Button::new("×").fill(egui::Color32::TRANSPARENT));
+            close_button.widget_info(|| {
+                let mut info = WidgetInfo::new(WidgetType::Button);
+                info.label = Some("Close".into());
+                info
+            });
+            if close_button.clicked() || close_button.middle_clicked() || tab.middle_clicked() {
+                window
+                    .queue_user_interface_command(UserInterfaceCommand::CloseWebView(webview.id()));
+            } else if !active && tab.clicked() {
+                window.activate_webview(webview.id());
+            }
+        }
+
+        let response = tab_frame.allocate_space(ui);
+        let fill_color = if active || response.hovered() {
             active_bg_color
         } else {
             inactive_bg_color
         };
-        ui.painter().rect_filled(rect, 8, fill_color);
-        if tab.has_focus() {
-            ui.painter().rect_stroke(
-                rect.shrink(1.0),
-                8,
-                egui::Stroke::new(1.0_f32, ui.visuals().hyperlink_color),
-                egui::StrokeKind::Inside,
-            );
-        }
-
-        let icon_rect = egui::Rect::from_center_size(
-            pos2(rect.left() + 18.0, rect.center().y),
-            Vec2::splat(16.0),
-        );
-        let youtube = Url::parse(&page.url).is_ok_and(|url| {
-            matches!(url.scheme(), "https" | "http")
-                && matches!(
-                    url.host_str(),
-                    Some("youtube.com" | "www.youtube.com" | "m.youtube.com" | "music.youtube.com")
-                )
-        });
-        if deferred {
-            super::icons::paint(
-                ui,
-                icon_rect,
-                super::icons::Icon::History,
-                ui.visuals().weak_text_color(),
-            );
-        } else if youtube {
-            super::icons::paint(
-                ui,
-                icon_rect,
-                super::icons::Icon::YouTube,
-                egui::Color32::WHITE,
-            );
-        } else if let Some(favicon) = favicon_texture {
-            let scale = 16.0 / favicon.size.x.max(favicon.size.y).max(1.0);
-            let image_rect = egui::Rect::from_center_size(icon_rect.center(), favicon.size * scale);
-            ui.painter().image(
-                favicon.id,
-                image_rect,
-                egui::Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
-                egui::Color32::WHITE,
-            );
-        } else {
-            super::icons::paint(
-                ui,
-                icon_rect,
-                super::icons::Icon::Network,
-                ui.visuals().weak_text_color(),
-            );
-        }
-
-        let title_rect = egui::Rect::from_min_max(
-            pos2(icon_rect.right() + 8.0, rect.top()),
-            pos2(close_rect.left() - 6.0, rect.bottom()),
-        );
-        let text_color = if active {
-            ui.visuals().text_color()
-        } else {
-            ui.visuals().weak_text_color()
-        };
-        let mut title = egui::text::LayoutJob::simple(
-            label,
-            egui::TextStyle::Button.resolve(ui.style()),
-            text_color,
-            title_rect.width(),
-        );
-        title.wrap = egui::text::TextWrapping::truncate_at_width(title_rect.width());
-        title.break_on_newline = false;
-        let galley = ui.painter().layout_job(title);
-        ui.painter()
-            .with_clip_rect(title_rect.intersect(ui.clip_rect()))
-            .galley(
-                pos2(
-                    title_rect.left(),
-                    title_rect.center().y - galley.size().y / 2.0,
-                ),
-                galley,
-                text_color,
-            );
-
-        if close_button.hovered() || close_button.is_pointer_button_down_on() {
-            ui.painter().rect_filled(
-                close_rect.shrink(1.0),
-                6,
-                ui.visuals().widgets.hovered.weak_bg_fill,
-            );
-        }
-        if close_button.has_focus() {
-            ui.painter().rect_stroke(
-                close_rect.shrink(1.0),
-                6,
-                egui::Stroke::new(1.0_f32, ui.visuals().hyperlink_color),
-                egui::StrokeKind::Inside,
-            );
-        }
-        super::icons::paint(
-            ui,
-            egui::Rect::from_center_size(close_rect.center(), Vec2::splat(16.0)),
-            super::icons::Icon::Close,
-            if close_button.hovered() {
-                ui.visuals().text_color()
-            } else {
-                ui.visuals().weak_text_color()
-            },
-        );
-        if close_button.clicked() || close_button.middle_clicked() || tab.middle_clicked() {
-            window.queue_user_interface_command(UserInterfaceCommand::CloseWebView(webview.id()));
-        } else if !active && tab.clicked() {
-            window.activate_webview(webview.id());
-        }
+        tab_frame.frame.fill = fill_color;
+        tab_frame.end(ui);
     }
 
     /// Update the user interface, but do not paint the updated state.
@@ -504,7 +445,7 @@ impl Gui {
             super::browser_chrome::configure(ctx);
             if let Some((source, passwords)) = password_manager {
                 let source = state.window(*source);
-                passwords.show_manager(ctx, source.as_deref(), winit_window);
+                passwords.show_manager(ctx, source.as_deref());
                 *toolbar_height = Length::new(winit_window.inner_size().height as f32);
                 return;
             }
@@ -618,7 +559,6 @@ impl Gui {
                 *toolbar_height = Length::new(ctx.available_rect_before_wrap().min.y);
                 browser_chrome.error_page(ctx, window, ctx.available_rect_before_wrap());
                 browser_chrome.windows(ctx, state, window);
-                super::autofill::show(ctx, window);
             } else {
                 *toolbar_height = Length::default();
             }
@@ -855,9 +795,9 @@ fn embedder_image_to_egui_image(image: &Image) -> egui::ColorImage {
         PixelFormat::K8 => egui::ColorImage::from_gray([width, height], image.data()),
         PixelFormat::KA8 => {
             // Convert to rgba
-            let (chunks, _) = image.data().as_chunks::<2>();
-            let data: Vec<u8> = chunks
-                .iter()
+            let data: Vec<u8> = image
+                .data()
+                .chunks_exact(2)
                 .flat_map(|pixel| [pixel[0], pixel[0], pixel[0], pixel[1]])
                 .collect();
             egui::ColorImage::from_rgba_unmultiplied([width, height], &data)
@@ -868,9 +808,9 @@ fn embedder_image_to_egui_image(image: &Image) -> egui::ColorImage {
         },
         PixelFormat::BGRA8 => {
             // Convert from BGRA to RGBA
-            let (chunks, _) = image.data().as_chunks::<4>();
-            let data: Vec<u8> = chunks
-                .iter()
+            let data: Vec<u8> = image
+                .data()
+                .chunks_exact(4)
                 .flat_map(|chunk| [chunk[2], chunk[1], chunk[0], chunk[3]])
                 .collect();
             egui::ColorImage::from_rgba_unmultiplied([width, height], &data)
